@@ -1,10 +1,15 @@
-const CACHE_NAME = 'baronne-malia-v1';
+const CACHE_NAME = 'baronne-malia-v2';
+
+// Detect the base path from the service worker's location
+// e.g. /BaronneMalia/ or /
+const BASE = self.location.pathname.replace(/\/sw\.js$/, '/') || '/';
+
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
+  BASE,
+  BASE + 'index.html',
+  BASE + 'manifest.json',
+  BASE + 'icon-192x192.png',
+  BASE + 'icon-512x512.png'
 ];
 
 // Install: cache all static assets
@@ -56,7 +61,7 @@ self.addEventListener('fetch', (event) => {
       }).catch(() => {
         // Network failed, try to serve cached index.html for navigation requests
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match(BASE + 'index.html');
         }
         return new Response('Offline', { status: 503 });
       });

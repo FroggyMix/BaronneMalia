@@ -1,23 +1,23 @@
 {
   "name": "Baronne Malia - Suivi de Croissance",
   "short_name": "Baronne Malia",
-  "description": "Suivi de croissance et nutrition pour Golden Retriever - Courbes scientifiques, calculs FEDIAF, conseils vétérinaires",
-  "start_url": "/",
+  "description": "Suivi de croissance et nutrition pour Golden Retriever - Courbes scientifiques, calculs FEDIAF, conseils veterinaires",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#FAF6F0",
   "theme_color": "#FAF6F0",
   "orientation": "portrait",
-  "scope": "/",
+  "scope": "./",
   "lang": "fr",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "./icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "./icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
