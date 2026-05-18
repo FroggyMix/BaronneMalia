@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Baronne Malia</string>
+    <string name="title_activity_main">Baronne Malia</string>
+    <string name="package_name">com.baronnemalia.app</string>
+    <string name="custom_url_scheme">com.baronnemalia.app</string>
+</resources>
