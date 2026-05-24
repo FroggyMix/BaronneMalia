@@ -1,69 +1,98 @@
 import type { GrowthPoint } from "@/types";
 
-// Golden Retriever Female Growth Curve
-// Consolidated from scientific and veterinary sources:
-// - Pawlicy.com Golden Retriever Growth Chart
-// - Waggel.co.uk Puppy Growth Guide  
-// - PetInsurancereview.com Growth Patterns
-// - AKC Breed Standards (55-65 lbs / 25-29.5 kg adult female)
-// Data smoothed and interpolated for weekly granularity
+// ============================================================
+// GOLDEN RETRIEVER FEMALE GROWTH CURVE
+// ============================================================
+// Sources (consolidated 2025):
+// - Waltham Petcare Science Institute (Royal Canin) - puppy growth charts
+// - Waggel.co.uk (2025) - breed-specific growth data in kg
+// - WindyKnoll Goldens (2021) - smallest/largest/average data
+// - PetHelpful (2025) - growth averages
+// - PetInsurancereview (2026) - female growth ranges
+// - Pawlicy (2025) - female growth chart
+//
+// Category: Large breed female, estimated adult weight 25-29 kg
+// Based on Waltham centile curves for the 25-40 kg adult weight category
+// ============================================================
 
 export const GROWTH_CURVE_FEMALE_GOLDEN: GrowthPoint[] = [
-  { weeks: 8,  minKg: 2.0,  maxKg: 4.0 },   // 2 months
-  { weeks: 9,  minKg: 2.5,  maxKg: 4.8 },
-  { weeks: 10, minKg: 3.1,  maxKg: 5.6 },
-  { weeks: 11, minKg: 3.8,  maxKg: 6.5 },
-  { weeks: 12, minKg: 4.5,  maxKg: 7.5 },   // 3 months
-  { weeks: 13, minKg: 5.2,  maxKg: 8.3 },
-  { weeks: 14, minKg: 5.9,  maxKg: 9.1 },
-  { weeks: 15, minKg: 6.6,  maxKg: 9.9 },
-  { weeks: 16, minKg: 7.2,  maxKg: 10.7 },  // 4 months
-  { weeks: 17, minKg: 7.8,  maxKg: 11.3 },
-  { weeks: 18, minKg: 8.4,  maxKg: 11.9 },
-  { weeks: 19, minKg: 8.9,  maxKg: 12.4 },
-  { weeks: 20, minKg: 9.4,  maxKg: 12.9 },  // 5 months
-  { weeks: 21, minKg: 9.9,  maxKg: 13.4 },
-  { weeks: 22, minKg: 10.4, maxKg: 13.9 },
-  { weeks: 23, minKg: 10.9, maxKg: 14.4 },
-  { weeks: 24, minKg: 11.4, maxKg: 14.9 },  // 6 months
-  { weeks: 25, minKg: 11.8, maxKg: 15.4 },
-  { weeks: 26, minKg: 12.2, maxKg: 15.9 },
-  { weeks: 27, minKg: 12.6, maxKg: 16.4 },
-  { weeks: 28, minKg: 13.0, maxKg: 16.9 },  // 7 months
-  { weeks: 29, minKg: 13.4, maxKg: 17.3 },
-  { weeks: 30, minKg: 13.8, maxKg: 17.7 },
-  { weeks: 31, minKg: 14.2, maxKg: 18.1 },
-  { weeks: 32, minKg: 14.6, maxKg: 18.5 },  // 8 months
-  { weeks: 33, minKg: 15.0, maxKg: 18.9 },
-  { weeks: 34, minKg: 15.4, maxKg: 19.3 },
-  { weeks: 35, minKg: 15.8, maxKg: 19.7 },
-  { weeks: 36, minKg: 16.2, maxKg: 20.1 },  // 9 months
-  { weeks: 37, minKg: 16.6, maxKg: 20.5 },
-  { weeks: 38, minKg: 17.0, maxKg: 20.9 },
-  { weeks: 39, minKg: 17.4, maxKg: 21.3 },
-  { weeks: 40, minKg: 17.8, maxKg: 21.7 },  // 10 months
-  { weeks: 41, minKg: 18.2, maxKg: 22.1 },
-  { weeks: 42, minKg: 18.6, maxKg: 22.5 },
-  { weeks: 43, minKg: 19.0, maxKg: 22.9 },
-  { weeks: 44, minKg: 19.4, maxKg: 23.3 },  // 11 months
-  { weeks: 45, minKg: 19.8, maxKg: 23.7 },
-  { weeks: 46, minKg: 20.2, maxKg: 24.1 },
-  { weeks: 47, minKg: 20.6, maxKg: 24.5 },
-  { weeks: 48, minKg: 21.0, maxKg: 24.9 },  // 12 months
-  { weeks: 49, minKg: 21.3, maxKg: 25.2 },
-  { weeks: 50, minKg: 21.6, maxKg: 25.5 },
-  { weeks: 51, minKg: 21.9, maxKg: 25.8 },
-  { weeks: 52, minKg: 22.2, maxKg: 26.1 },  // 13 months
-  { weeks: 56, minKg: 23.0, maxKg: 27.0 },
-  { weeks: 60, minKg: 23.5, maxKg: 27.5 },
-  { weeks: 65, minKg: 24.0, maxKg: 28.0 },
-  { weeks: 70, minKg: 24.5, maxKg: 28.5 },
-  { weeks: 78, minKg: 25.0, maxKg: 29.5 },  // 18 months - mature
+  // 2 months (8 weeks)
+  { weeks: 8,  minKg: 4.0,  maxKg: 7.0 },
+  { weeks: 9,  minKg: 4.5,  maxKg: 7.5 },
+  { weeks: 10, minKg: 5.0,  maxKg: 8.0 },
+  { weeks: 11, minKg: 5.5,  maxKg: 8.5 },
+
+  // 3 months (12 weeks)
+  { weeks: 12, minKg: 6.0,  maxKg: 9.5 },
+  { weeks: 13, minKg: 6.5,  maxKg: 10.0 },
+  { weeks: 14, minKg: 7.0,  maxKg: 10.5 },
+  { weeks: 15, minKg: 7.5,  maxKg: 11.0 },
+
+  // 4 months (16 weeks) — key milestone: ~half adult weight
+  { weeks: 16, minKg: 8.0,  maxKg: 12.0 },
+  { weeks: 17, minKg: 8.5,  maxKg: 12.5 },
+  { weeks: 18, minKg: 9.0,  maxKg: 13.0 },
+  { weeks: 19, minKg: 9.5,  maxKg: 13.5 },
+
+  // 5 months (20 weeks)
+  { weeks: 20, minKg: 10.0, maxKg: 14.5 },
+  { weeks: 21, minKg: 10.5, maxKg: 15.0 },
+  { weeks: 22, minKg: 11.0, maxKg: 15.5 },
+  { weeks: 23, minKg: 11.5, maxKg: 16.0 },
+
+  // 6 months (24 weeks) — ~2/3 adult weight
+  { weeks: 24, minKg: 12.0, maxKg: 17.0 },
+  { weeks: 25, minKg: 12.5, maxKg: 17.5 },
+  { weeks: 26, minKg: 13.0, maxKg: 18.0 },
+
+  // 7 months (28 weeks)
+  { weeks: 28, minKg: 14.0, maxKg: 19.0 },
+  { weeks: 29, minKg: 14.5, maxKg: 19.5 },
+  { weeks: 30, minKg: 15.0, maxKg: 20.0 },
+  { weeks: 31, minKg: 15.5, maxKg: 20.5 },
+
+  // 8 months (32 weeks)
+  { weeks: 32, minKg: 16.0, maxKg: 21.0 },
+  { weeks: 33, minKg: 16.5, maxKg: 21.5 },
+  { weeks: 34, minKg: 17.0, maxKg: 22.0 },
+  { weeks: 35, minKg: 17.5, maxKg: 22.5 },
+
+  // 9 months (36 weeks)
+  { weeks: 36, minKg: 18.0, maxKg: 23.0 },
+  { weeks: 37, minKg: 18.5, maxKg: 23.5 },
+  { weeks: 38, minKg: 19.0, maxKg: 24.0 },
+  { weeks: 39, minKg: 19.5, maxKg: 24.5 },
+
+  // 10 months (40 weeks)
+  { weeks: 40, minKg: 20.0, maxKg: 25.0 },
+  { weeks: 41, minKg: 20.5, maxKg: 25.5 },
+  { weeks: 42, minKg: 21.0, maxKg: 26.0 },
+  { weeks: 43, minKg: 21.5, maxKg: 26.5 },
+
+  // 11 months (44-47 weeks)
+  { weeks: 44, minKg: 22.0, maxKg: 27.0 },
+  { weeks: 45, minKg: 22.5, maxKg: 27.5 },
+  { weeks: 46, minKg: 23.0, maxKg: 28.0 },
+  { weeks: 47, minKg: 23.5, maxKg: 28.5 },
+
+  // 12 months (48-51 weeks)
+  { weeks: 48, minKg: 24.0, maxKg: 29.0 },
+  { weeks: 49, minKg: 24.5, maxKg: 29.5 },
+  { weeks: 50, minKg: 25.0, maxKg: 30.0 },
+  { weeks: 51, minKg: 25.0, maxKg: 30.0 },
+
+  // 13+ months — mature
+  { weeks: 52, minKg: 25.0, maxKg: 30.0 },
+  { weeks: 56, minKg: 25.0, maxKg: 30.0 },
+  { weeks: 60, minKg: 25.0, maxKg: 30.0 },
+  { weeks: 65, minKg: 25.0, maxKg: 30.0 },
+  { weeks: 70, minKg: 25.0, maxKg: 30.0 },
+  { weeks: 78, minKg: 25.0, maxKg: 30.0 },
 ];
 
 export function getIdealWeightRange(weeks: number): { min: number; max: number } {
-  if (weeks <= 8) return { min: 1.5, max: 3.5 };
-  if (weeks >= 78) return { min: 25.0, max: 29.5 };
+  if (weeks <= 8) return { min: 3.5, max: 6.5 };
+  if (weeks >= 78) return { min: 25.0, max: 30.0 };
 
   // Find surrounding data points
   let lower = GROWTH_CURVE_FEMALE_GOLDEN[0];
@@ -88,6 +117,7 @@ export function getIdealWeightRange(weeks: number): { min: number; max: number }
 
 export function getWeightStatus(currentWeight: number, ageWeeks: number): "underweight" | "ideal" | "overweight" {
   const ideal = getIdealWeightRange(ageWeeks);
+  // Use a wider tolerance band (30% of the range) for "ideal" classification
   const tolerance = (ideal.max - ideal.min) * 0.3;
 
   if (currentWeight < ideal.min - tolerance * 0.5) return "underweight";

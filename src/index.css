@@ -34,36 +34,60 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Custom colors for Baronne Malia */
+    --bm-cream: #FAF6F0;
+    --bm-charcoal: #2D2A26;
+    --bm-gold: #C8956C;
+    --bm-gold-hover: #A67B5B;
+    --bm-pale-gold: #F0E2D0;
+    --bm-card-bg: #FFFFFF;
+    --bm-border: rgba(45, 42, 38, 0.1);
+    --bm-text-secondary: rgba(45, 42, 38, 0.6);
+    --bm-text-tertiary: rgba(45, 42, 38, 0.5);
+    --bm-surface: #FAF6F0;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
+    --background: 240 6% 10%;
+    --foreground: 0 0% 95%;
+    --card: 240 5% 14%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 5% 14%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 95%;
     --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
+    --secondary: 240 4% 18%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 4% 18%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 18%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 62.8% 30%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 240 5% 84%;
+    --sidebar-background: 240 6% 10%;
+    --sidebar-foreground: 240 5% 90%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-accent: 240 4% 18%;
+    --sidebar-accent-foreground: 240 5% 90%;
+    --sidebar-border: 240 4% 18%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Custom dark colors */
+    --bm-cream: #1A1917;
+    --bm-charcoal: #F5F0E8;
+    --bm-gold: #D4A070;
+    --bm-gold-hover: #B8885E;
+    --bm-pale-gold: #2D2A24;
+    --bm-card-bg: #242320;
+    --bm-border: rgba(245, 240, 232, 0.1);
+    --bm-text-secondary: rgba(245, 240, 232, 0.6);
+    --bm-text-tertiary: rgba(245, 240, 232, 0.5);
+    --bm-surface: #1E1D1B;
   }
 }
 
@@ -77,11 +101,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
   body {
-    background-color: #FAF6F0;
-    color: #2D2A26;
+    background-color: var(--bm-cream);
+    color: var(--bm-charcoal);
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
   /* Hide scrollbar but allow scrolling */
   ::-webkit-scrollbar {

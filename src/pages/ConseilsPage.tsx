@@ -50,13 +50,11 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
     ? getFeedingRecommendation(currentWeight, ageWeeks, profile.neutered, profile.activityLevel, weightHistory)
     : null;
 
-  // Personalized advice
   const personalizedAdvice = useMemo(() => {
     if (currentWeight === 0) return [];
     return getAdviceForAge(ageWeeks, currentWeight, weightStatus);
   }, [ageWeeks, currentWeight, weightStatus]);
 
-  // Category advice
   const categoryAdvice = useMemo(() => getAdviceByCategory(), []);
 
   const toggleCategory = (cat: string) => {
@@ -67,30 +65,33 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
     setExpandedAdvice((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const cardBg = { backgroundColor: "var(--bm-card-bg)" };
+  const textPrimary = { color: "var(--bm-charcoal)" };
+  const textSecondary = { color: "var(--bm-text-secondary)" };
+
   return (
-    <div className="min-h-screen bg-[#FAF6F0] pb-24">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
       <Header title="Conseils & Nutrition" showBack />
 
       <main className="pt-20 px-5 max-w-lg mx-auto space-y-4">
-        {/* Personalized Recommendation Hero */}
         {currentWeight > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-[#F0E2D0] rounded-2xl p-5 shadow-md"
+            className="rounded-2xl p-5 shadow-md"
+            style={{ backgroundColor: "var(--bm-pale-gold)" }}
           >
             <div className="flex items-center gap-2 mb-3">
-              <Target size={20} className="text-[#C8956C]" />
-              <h2 className="font-bold text-[#2D2A26]">Recommandation personnalisée</h2>
+              <Target size={20} style={{ color: "var(--bm-gold)" }} />
+              <h2 className="font-bold" style={textPrimary}>Recommandation personnalisée</h2>
             </div>
 
-            <div className="flex items-center gap-2 mb-3 text-sm text-[rgba(45,42,38,0.7)]">
+            <div className="flex items-center gap-2 mb-3 text-sm" style={textSecondary}>
               <span>Basé sur : {ageWeeks} semaines · {currentWeight} kg</span>
-              <span
-                className="px-2 py-0.5 rounded-full text-xs font-medium"
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium"
                 style={{
-                  backgroundColor: weightStatus === "ideal" ? "#D4E0CD" : weightStatus === "underweight" ? "#F0E2D0" : "#E8D0CA",
-                  color: weightStatus === "ideal" ? "#7A8B6E" : weightStatus === "underweight" ? "#C8956C" : "#C06B5A",
+                  backgroundColor: weightStatus === "ideal" ? "#D4E0CD" : weightStatus === "underweight" ? "var(--bm-pale-gold)" : "#E8D0CA",
+                  color: weightStatus === "ideal" ? "#7A8B6E" : weightStatus === "underweight" ? "var(--bm-gold)" : "#C06B5A",
                 }}
               >
                 {weightStatus === "ideal" ? "✓ Poids idéal" : weightStatus === "underweight" ? "Sous-poids" : "Surpoids"}
@@ -100,15 +101,14 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
             {feedingRec && (
               <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-[#C8956C]">{feedingRec.dailyKcal}</span>
-                  <span className="text-sm text-[rgba(45,42,38,0.7)]">kcal/jour</span>
+                  <span className="text-2xl font-bold" style={{ color: "var(--bm-gold)" }}>{feedingRec.dailyKcal}</span>
+                  <span className="text-sm" style={textSecondary}>kcal/jour</span>
                 </div>
-                <p className="text-sm text-[rgba(45,42,38,0.7)]">
-                  {feedingRec.mealsPerDay} repas de ~{feedingRec.kcalPerMeal} kcal
-                  {" "}(≈ {feedingRec.cupsEstimate} tasses)
+                <p className="text-sm" style={textSecondary}>
+                  {feedingRec.mealsPerDay} repas de ~{feedingRec.kcalPerMeal} kcal (≈ {feedingRec.cupsEstimate} tasses)
                 </p>
                 {feedingRec.warning && (
-                  <div className="mt-2 p-2.5 bg-[#E8D0CA] rounded-lg flex items-start gap-2">
+                  <div className="mt-2 p-2.5 rounded-lg flex items-start gap-2" style={{ backgroundColor: "#E8D0CA" }}>
                     <AlertTriangle size={14} className="text-[#C06B5A] mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-[#C06B5A]">{feedingRec.warning}</p>
                   </div>
@@ -116,8 +116,8 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
               </div>
             )}
 
-            <div className="mt-3 p-2.5 bg-white/60 rounded-lg">
-              <p className="text-xs text-[rgba(45,42,38,0.7)] leading-relaxed">
+            <div className="mt-3 p-2.5 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
+              <p className="text-xs leading-relaxed" style={textSecondary}>
                 <strong className="text-[#C06B5A]">⚠️ Ne pas sur-nourrir !</strong> Les Golden Retrievers
                 sont génétiquement prédisposés à l'obésité (gène DENND1B, étude 2025). Utilisez le BCS
                 et la courbe de poids, jamais les signaux de "faim" de votre chien.
@@ -126,44 +126,29 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
           </motion.div>
         )}
 
-        {/* Personalized advice list */}
         {personalizedAdvice.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <button
-              onClick={() => toggleCategory("personalized")}
-              className="w-full flex items-center justify-between p-4 hover:bg-[#FAF6F0] transition-colors"
+          <div className="rounded-2xl shadow-sm overflow-hidden" style={cardBg}>
+            <button onClick={() => toggleCategory("personalized")}
+              className="w-full flex items-center justify-between p-4 transition-colors"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <div className="flex items-center gap-3">
-                <CircleDot size={20} className="text-[#C8956C]" />
-                <span className="font-semibold text-[#2D2A26]">Conseils personnalisés</span>
-                <span className="px-2 py-0.5 bg-[#F0E2D0] rounded-full text-xs font-medium text-[#C8956C]">
+                <CircleDot size={20} style={{ color: "var(--bm-gold)" }} />
+                <span className="font-semibold" style={textPrimary}>Conseils personnalisés</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}>
                   {personalizedAdvice.length}
                 </span>
               </div>
-              {expandedCategories.personalized ? (
-                <ChevronUp size={18} className="text-[rgba(45,42,38,0.4)]" />
-              ) : (
-                <ChevronDown size={18} className="text-[rgba(45,42,38,0.4)]" />
-              )}
+              {expandedCategories.personalized ? <ChevronUp size={18} style={{ color: "var(--bm-text-secondary)" }} /> : <ChevronDown size={18} style={{ color: "var(--bm-text-secondary)" }} />}
             </button>
 
             <AnimatePresence>
               {expandedCategories.personalized && (
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: "auto" }}
-                  exit={{ height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
+                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                   <div className="px-4 pb-4 space-y-2">
                     {personalizedAdvice.slice(0, 5).map((advice) => (
-                      <AdviceCard
-                        key={advice.id}
-                        advice={advice}
-                        expanded={!!expandedAdvice[advice.id]}
-                        onToggle={() => toggleAdvice(advice.id)}
-                      />
+                      <AdviceCard key={advice.id} advice={advice} expanded={!!expandedAdvice[advice.id]} onToggle={() => toggleAdvice(advice.id)} />
                     ))}
                   </div>
                 </motion.div>
@@ -172,57 +157,36 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
           </div>
         )}
 
-        {/* Category sections */}
         {Object.entries(categoryAdvice).map(([category, adviceList]) => {
           const config = CATEGORY_CONFIG[category];
           if (!config || adviceList.length === 0) return null;
           const Icon = config.icon;
 
           return (
-            <div key={category} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full flex items-center justify-between p-4 hover:bg-[#FAF6F0] transition-colors"
+            <div key={category} className="rounded-2xl shadow-sm overflow-hidden" style={cardBg}>
+              <button onClick={() => toggleCategory(category)}
+                className="w-full flex items-center justify-between p-4 transition-colors"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               >
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: config.bg }}
-                  >
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: config.bg }}>
                     <Icon size={18} style={{ color: config.color }} />
                   </div>
-                  <span className="font-semibold text-[#2D2A26]">{config.label}</span>
-                  <span
-                    className="px-2 py-0.5 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: config.bg, color: config.color }}
-                  >
+                  <span className="font-semibold" style={textPrimary}>{config.label}</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: config.bg, color: config.color }}>
                     {adviceList.length}
                   </span>
                 </div>
-                {expandedCategories[category] ? (
-                  <ChevronUp size={18} className="text-[rgba(45,42,38,0.4)]" />
-                ) : (
-                  <ChevronDown size={18} className="text-[rgba(45,42,38,0.4)]" />
-                )}
+                {expandedCategories[category] ? <ChevronUp size={18} style={{ color: "var(--bm-text-secondary)" }} /> : <ChevronDown size={18} style={{ color: "var(--bm-text-secondary)" }} />}
               </button>
 
               <AnimatePresence>
                 {expandedCategories[category] && (
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: "auto" }}
-                    exit={{ height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
+                  <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                     <div className="px-4 pb-4 space-y-2">
                       {adviceList.map((advice) => (
-                        <AdviceCard
-                          key={advice.id}
-                          advice={advice}
-                          expanded={!!expandedAdvice[advice.id]}
-                          onToggle={() => toggleAdvice(advice.id)}
-                        />
+                        <AdviceCard key={advice.id} advice={advice} expanded={!!expandedAdvice[advice.id]} onToggle={() => toggleAdvice(advice.id)} />
                       ))}
                     </div>
                   </motion.div>
@@ -232,16 +196,11 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
           );
         })}
 
-        {/* References */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-2xl p-5 shadow-sm"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="rounded-2xl p-5 shadow-sm" style={cardBg}>
           <div className="flex items-center gap-2 mb-3">
-            <BookOpenCheck size={18} className="text-[#6B8FA3]" />
-            <h3 className="font-semibold text-[#2D2A26]">Sources scientifiques</h3>
+            <BookOpenCheck size={18} style={{ color: "#6B8FA3" }} />
+            <h3 className="font-semibold" style={textPrimary}>Sources scientifiques</h3>
           </div>
           <ul className="space-y-2">
             {[
@@ -255,15 +214,14 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
               "Raffan et al. — DENND1B and obesity in dogs (Science 2025)",
             ].map((source, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#6B8FA3] mt-2 flex-shrink-0" />
-                <span className="text-xs text-[rgba(45,42,38,0.6)]">{source}</span>
+                <span className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: "#6B8FA3" }} />
+                <span className="text-xs" style={{ color: "var(--bm-text-secondary)" }}>{source}</span>
               </li>
             ))}
           </ul>
         </motion.div>
 
-        {/* Disclaimer */}
-        <p className="text-xs text-center text-[rgba(45,42,38,0.4)] px-4 pb-4">
+        <p className="text-xs text-center pb-4" style={{ color: "var(--bm-text-tertiary)" }}>
           Ces recommandations sont fournies à titre informatif et ne remplacent pas les conseils
           vétérinaires personnalisés. Consultez toujours votre vétérinaire pour des décisions de santé.
         </p>
@@ -272,59 +230,35 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
   );
 }
 
-function AdviceCard({
-  advice,
-  expanded,
-  onToggle,
-}: {
-  advice: NutritionAdvice;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
+function AdviceCard({ advice, expanded, onToggle }: { advice: NutritionAdvice; expanded: boolean; onToggle: () => void }) {
   const priority = PRIORITY_CONFIG[advice.priority];
 
   return (
-    <div className="border border-[rgba(45,42,38,0.08)] rounded-xl overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-start gap-3 p-3 hover:bg-[#FAF6F0] transition-colors text-left"
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--bm-border)" }}>
+      <button onClick={onToggle}
+        className="w-full flex items-start gap-3 p-3 transition-colors text-left"
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-[#2D2A26]">{advice.title}</span>
-            <span
-              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
-              style={{ backgroundColor: priority.bg, color: priority.color }}
-            >
+            <span className="font-medium text-sm" style={{ color: "var(--bm-charcoal)" }}>{advice.title}</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0" style={{ backgroundColor: priority.bg, color: priority.color }}>
               {priority.label}
             </span>
           </div>
         </div>
-        {expanded ? (
-          <ChevronUp size={16} className="text-[rgba(45,42,38,0.4)] flex-shrink-0 mt-0.5" />
-        ) : (
-          <ChevronDown size={16} className="text-[rgba(45,42,38,0.4)] flex-shrink-0 mt-0.5" />
-        )}
+        {expanded ? <ChevronUp size={16} className="flex-shrink-0 mt-0.5" style={{ color: "var(--bm-text-secondary)" }} /> : <ChevronDown size={16} className="flex-shrink-0 mt-0.5" style={{ color: "var(--bm-text-secondary)" }} />}
       </button>
 
       <AnimatePresence>
         {expanded && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: "auto" }}
-            exit={{ height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
+          <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
             <div className="px-3 pb-3 pt-1">
-              <div className="bg-[#FAF6F0] rounded-lg p-3">
-                <p className="text-sm text-[rgba(45,42,38,0.8)] leading-relaxed whitespace-pre-line">
-                  {advice.content}
-                </p>
+              <div className="rounded-lg p-3" style={{ backgroundColor: "var(--bm-surface)" }}>
+                <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "var(--bm-text-secondary)" }}>{advice.content}</p>
                 {advice.source && (
-                  <p className="text-xs text-[rgba(45,42,38,0.5)] mt-2 italic">
-                    Source : {advice.source}
-                  </p>
+                  <p className="text-xs mt-2 italic" style={{ color: "var(--bm-text-tertiary)" }}>Source : {advice.source}</p>
                 )}
               </div>
             </div>

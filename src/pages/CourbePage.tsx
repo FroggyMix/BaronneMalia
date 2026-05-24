@@ -14,9 +14,9 @@ import {
   type ChartData,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { format, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { TrendingUp, TrendingDown, Minus, Scale, Calendar, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Scale, Calendar, Target, ChevronLeft, ChevronRight, FileSpreadsheet, Download } from "lucide-react";
 import { Header } from "@/components/Header";
 import { getIdealWeightRange } from "@/data/growthCurve";
 import {
@@ -26,7 +26,7 @@ import {
   getWeightStatus,
   getWeightStatusLabel,
 } from "@/utils/calculations";
-import type { AppData } from "@/types";
+import type { AppData, WeightEntry } from "@/types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -52,10 +52,13 @@ const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> =
   "Pas assez de données": { icon: Minus, color: "rgba(45,42,38,0.4)" },
 };
 
+const ITEMS_PER_PAGE = 10;
+
 export function CourbePage({ data }: CourbePageProps) {
   const navigate = useNavigate();
   const chartRef = useRef<ChartJS<"line">>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { profile, weightHistory } = data;
   const ageWeeks = getAgeInWeeks(profile.birthDate);
@@ -65,38 +68,33 @@ export function CourbePage({ data }: CourbePageProps) {
   const weightStatus = getWeightStatus(currentWeight, ageWeeks);
   const idealRange = getIdealWeightRange(ageWeeks);
 
-  // Filter entries by time range
-  const filteredEntries = useMemo(() => {
-    if (timeRange === "all" || weightHistory.length === 0) return weightHistory;
-
-    const now = new Date();
-    let cutoff: Date;
+  // Compute zoom window (in weeks)
+  const zoomWindow = useMemo(() => {
+    const endWeek = ageWeeks + 2; // +2 for slight padding
+    let startWeek: number;
     switch (timeRange) {
-      case "6m":
-        cutoff = subMonths(now, 6);
+      case "1m":
+        startWeek = Math.max(8, ageWeeks - 4);
         break;
       case "3m":
-        cutoff = subMonths(now, 3);
+        startWeek = Math.max(8, ageWeeks - 13);
         break;
-      case "1m":
-        cutoff = subMonths(now, 1);
+      case "6m":
+        startWeek = Math.max(8, ageWeeks - 26);
         break;
       default:
-        cutoff = subMonths(now, 12);
+        startWeek = 8;
     }
+    return { startWeek, endWeek };
+  }, [ageWeeks, timeRange]);
 
-    return weightHistory.filter((e) => new Date(e.date) >= cutoff);
-  }, [weightHistory, timeRange]);
-
-  // Build chart data
+  // Build chart data WITHIN the zoom window only
   const chartData = useMemo((): ChartData<"line"> => {
     if (weightHistory.length === 0) {
       return { labels: [], datasets: [] };
     }
 
-    const firstEntryWeek = getAgeInWeeks(profile.birthDate, weightHistory[0].date);
-    const currentWeek = ageWeeks;
-    const displayEndWeek = currentWeek + 6;
+    const { startWeek, endWeek } = zoomWindow;
 
     const labels: string[] = [];
     const idealMinData: (number | null)[] = [];
@@ -107,30 +105,51 @@ export function CourbePage({ data }: CourbePageProps) {
     const lastEntry = weightHistory[weightHistory.length - 1];
     const lastEntryWeek = getAgeInWeeks(profile.birthDate, lastEntry.date);
 
-    for (let w = Math.max(8, firstEntryWeek - 4); w <= displayEndWeek; w += 2) {
+    // Step size: every 1 week for zoomed views, every 2 weeks for "all"
+    const step = timeRange === "all" ? 2 : 1;
+
+    for (let w = startWeek; w <= endWeek; w += step) {
+      // Label: show month marker every 4 weeks
       const month = Math.floor(w / 4);
       const weekInMonth = w % 4;
       if (weekInMonth === 0) {
         labels.push(`${month}m`);
+      } else if (timeRange !== "all" && (w === startWeek || w === endWeek)) {
+        // Show start/end labels for zoomed views
+        labels.push(`${month}m${weekInMonth}`);
       } else {
         labels.push("");
       }
 
+      // Ideal range (always show up to 78 weeks, then plateau)
       if (w <= 78) {
         const ideal = getIdealWeightRange(w);
         idealMinData.push(ideal.min);
         idealMaxData.push(ideal.max);
       } else {
-        idealMinData.push(null);
-        idealMaxData.push(null);
+        // For adult ages beyond 78 weeks, use the mature plateau
+        idealMinData.push(25.0);
+        idealMaxData.push(30.0);
       }
 
-      const entryForWeek = filteredEntries.find((e) => {
+      // Actual data: find entry closest to this week
+      const entryForWeek = weightHistory.reduce<WeightEntry | null>((closest, e) => {
         const entryWeek = getAgeInWeeks(profile.birthDate, e.date);
-        return Math.abs(entryWeek - w) <= 1;
-      });
-      actualData.push(entryForWeek ? entryForWeek.weightKg : null);
+        if (Math.abs(entryWeek - w) <= Math.abs(getAgeInWeeks(profile.birthDate, closest?.date || e.date) - w)) {
+          return Math.abs(entryWeek - w) <= 1 ? e : closest;
+        }
+        return closest;
+      }, null);
 
+      // Only show actual data points if they fall within the zoom window
+      const closestEntryWeek = entryForWeek ? getAgeInWeeks(profile.birthDate, entryForWeek.date) : -999;
+      actualData.push(
+        entryForWeek && closestEntryWeek >= startWeek - 1 && closestEntryWeek <= endWeek + 1
+          ? entryForWeek.weightKg
+          : null
+      );
+
+      // Projection data
       if (w > lastEntryWeek && trend.projectedWeights.length > 0) {
         const projWeek = w - lastEntryWeek;
         const proj = trend.projectedWeights.find((p) => p.week === projWeek);
@@ -194,7 +213,37 @@ export function CourbePage({ data }: CourbePageProps) {
         },
       ],
     };
-  }, [weightHistory, filteredEntries, profile.birthDate, ageWeeks, trend, profile]);
+  }, [weightHistory, zoomWindow, profile.birthDate, ageWeeks, trend, profile, timeRange]);
+
+  // Dynamic Y axis based on visible data
+  const yAxisRange = useMemo(() => {
+    const { startWeek, endWeek } = zoomWindow;
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+
+    // Check ideal range
+    for (let w = startWeek; w <= endWeek; w++) {
+      const ideal = getIdealWeightRange(w);
+      minVal = Math.min(minVal, ideal.min);
+      maxVal = Math.max(maxVal, ideal.max);
+    }
+
+    // Check actual data within window
+    weightHistory.forEach((e) => {
+      const w = getAgeInWeeks(profile.birthDate, e.date);
+      if (w >= startWeek && w <= endWeek) {
+        minVal = Math.min(minVal, e.weightKg);
+        maxVal = Math.max(maxVal, e.weightKg);
+      }
+    });
+
+    // Add padding
+    const padding = (maxVal - minVal) * 0.15;
+    return {
+      min: Math.max(0, Math.floor(minVal - padding)),
+      max: Math.ceil(maxVal + padding),
+    };
+  }, [zoomWindow, weightHistory, profile.birthDate]);
 
   const chartOptions: ChartOptions<"line"> = {
     responsive: true,
@@ -236,29 +285,62 @@ export function CourbePage({ data }: CourbePageProps) {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: "rgba(45,42,38,0.5)",
           maxRotation: 0,
-          callback: function(_value, index) {
-            const label = (this as any).chart.data.labels?.[index];
-            return label || "";
-          },
+          autoSkip: true,
+          maxTicksLimit: timeRange === "all" ? 12 : 6,
         },
         border: { color: "rgba(45,42,38,0.1)" },
       },
       y: {
-        beginAtZero: true,
+        min: yAxisRange.min,
+        max: yAxisRange.max,
         grid: { color: "rgba(45,42,38,0.05)" },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: "rgba(45,42,38,0.5)",
           callback: (value) => `${value} kg`,
+          stepSize: Math.max(1, Math.round((yAxisRange.max - yAxisRange.min) / 8)),
         },
         border: { display: false },
-        suggestedMax: 35,
       },
     },
     animation: {
-      duration: 1000,
+      duration: 600,
       easing: "easeOutQuart",
     },
+  };
+
+  // Pagination for weight history
+  const sortedEntries = useMemo(() => {
+    return [...weightHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [weightHistory]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedEntries.length / ITEMS_PER_PAGE));
+  const paginatedEntries = sortedEntries.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // CSV Export
+  const exportCSV = () => {
+    const sorted = [...weightHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const headers = ["Date", "Age (semaines)", "Poids (kg)", "BCS", "Notes"];
+    const rows = sorted.map((e) => [
+      e.date,
+      String(getAgeInWeeks(profile.birthDate, e.date)),
+      String(e.weightKg).replace(".", ","),
+      e.bodyConditionScore ? String(e.bodyConditionScore) : "",
+      e.notes ? `"${e.notes.replace(/"/g, "'")}"` : "",
+    ]);
+    const csv = [headers.join(";"), ...rows.map((r) => r.join(";"))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `baronne-malia-pesees-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const trendEntry = TREND_CONFIG[trend.trendDescription] || TREND_CONFIG["Pas assez de données"];
@@ -275,7 +357,10 @@ export function CourbePage({ data }: CourbePageProps) {
           {TIME_RANGES.map((range) => (
             <button
               key={range.value}
-              onClick={() => setTimeRange(range.value)}
+              onClick={() => {
+                setTimeRange(range.value);
+                setCurrentPage(1);
+              }}
               className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                 timeRange === range.value
                   ? "bg-[#C8956C] text-white shadow-sm"
@@ -399,11 +484,119 @@ export function CourbePage({ data }: CourbePageProps) {
           </motion.div>
         )}
 
+        {/* Export Buttons */}
+        {weightHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="flex gap-3"
+          >
+            <button
+              onClick={exportCSV}
+              className="flex-1 bg-white hover:bg-[#FAF6F0] text-[#2D2A26] rounded-xl py-3 px-4 shadow-sm border border-[rgba(45,42,38,0.1)] flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+            >
+              <FileSpreadsheet size={16} className="text-[#7A8B6E]" />
+              Export CSV
+            </button>
+            <button
+              onClick={() => {
+                const json = JSON.stringify(weightHistory, null, 2);
+                const blob = new Blob([json], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `baronne-malia-pesees-${format(new Date(), "yyyy-MM-dd")}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              }}
+              className="flex-1 bg-white hover:bg-[#FAF6F0] text-[#2D2A26] rounded-xl py-3 px-4 shadow-sm border border-[rgba(45,42,38,0.1)] flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+            >
+              <Download size={16} className="text-[#6B8FA3]" />
+              Export JSON
+            </button>
+          </motion.div>
+        )}
+
+        {/* Paginated Weight History */}
+        {weightHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-2xl p-5 shadow-md"
+          >
+            <h3 className="text-sm font-medium text-[rgba(45,42,38,0.6)] uppercase tracking-wider mb-4">
+              Historique des pesées
+            </h3>
+
+            <div className="space-y-2">
+              {paginatedEntries.map((entry) => {
+                const entryWeeks = getAgeInWeeks(profile.birthDate, entry.date);
+                const entryAgeMonths = Math.floor(entryWeeks / 4);
+                const entryAgeWeeksRemainder = entryWeeks % 4;
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between p-3 bg-[#FAF6F0] rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Scale size={16} className="text-[#C8956C]" />
+                      <div>
+                        <p className="font-semibold text-[#2D2A26]">{entry.weightKg} kg</p>
+                        <p className="text-xs text-[rgba(45,42,38,0.5)]">
+                          {format(new Date(entry.date), "d MMM yyyy", { locale: fr })}
+                          {" · "}
+                          {entryAgeMonths}m{entryAgeWeeksRemainder > 0 ? `${entryAgeWeeksRemainder}s` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {entry.bodyConditionScore && (
+                        <span className="px-2 py-0.5 bg-[#F0E2D0] rounded-full text-xs font-medium text-[#C8956C]">
+                          BCS {entry.bodyConditionScore}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-[rgba(45,42,38,0.08)]">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-[#C8956C] disabled:text-[rgba(45,42,38,0.3)] disabled:cursor-not-allowed hover:bg-[#FAF6F0] transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                  Précédent
+                </button>
+                <span className="text-sm text-[rgba(45,42,38,0.6)]">
+                  Page {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-[#C8956C] disabled:text-[rgba(45,42,38,0.3)] disabled:cursor-not-allowed hover:bg-[#FAF6F0] transition-colors"
+                >
+                  Suivant
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+
         {/* CTA */}
         <motion.button
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.25 }}
           onClick={() => navigate("/saisie")}
           className="w-full bg-[#C8956C] hover:bg-[#A67B5B] text-white rounded-2xl py-4 px-5 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold"
         >

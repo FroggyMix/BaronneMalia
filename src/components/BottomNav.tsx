@@ -16,9 +16,10 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[rgba(45,42,38,0.1)]"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t"
       style={{
-        backgroundColor: "#FAF6F0",
+        backgroundColor: "var(--bm-cream)",
+        borderColor: "var(--bm-border)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
@@ -33,17 +34,23 @@ export function BottomNav() {
               className="flex flex-col items-center justify-center gap-1 w-16 h-full relative transition-colors duration-200"
             >
               {isActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-[#C8956C]" />
+                <span
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+                  style={{ backgroundColor: "var(--bm-gold)" }}
+                />
               )}
               <Icon
                 size={22}
-                className={isActive ? "text-[#C8956C]" : "text-[rgba(45,42,38,0.4)]"}
+                style={{
+                  color: isActive ? "var(--bm-gold)" : "var(--bm-text-tertiary)",
+                }}
                 strokeWidth={isActive ? 2.5 : 1.5}
               />
               <span
-                className={`text-[10px] font-medium ${
-                  isActive ? "text-[#C8956C]" : "text-[rgba(45,42,38,0.4)]"
-                }`}
+                className="text-[10px] font-medium"
+                style={{
+                  color: isActive ? "var(--bm-gold)" : "var(--bm-text-tertiary)",
+                }}
               >
                 {tab.label}
               </span>
