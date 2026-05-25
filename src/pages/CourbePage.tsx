@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -29,7 +29,7 @@ import {
   Download,
 } from "lucide-react";
 import { Header } from "@/components/Header";
-import { getIdealWeightRangeRef } from "@/data/growthReferences";
+import { getIdealWeightRangeRef, getReferenceData, GROWTH_REFERENCES } from "@/data/growthReferences";
 import {
   getAgeInWeeks,
   getWeightStats,
@@ -84,6 +84,16 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains("dark"));
+
+  // Watch for dark mode changes to update chart colors
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   const { profile, weightHistory } = data;
   const ageWeeks = getAgeInWeeks(profile.birthDate);
@@ -153,14 +163,37 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
   const chartData = useMemo((): ChartData<"line"> => {
     if (weightHistory.length === 0) return { labels: [], datasets: [] };
 
-    // 1. Ideal range — dense interpolated curve
+    // 1. Ideal range — smooth interpolated curve using TRUE linear interpolation
+    // between each integer week, NOT rounding to nearest week
     const idealMinPoints: Point[] = [];
     const idealMaxPoints: Point[] = [];
-    const step = 0.5; // half-week steps for smooth curve
+    const refData = getReferenceData(selectedReference);
+    const step = 0.25; // quarter-week steps for ultra-smooth curve
     for (let w = startWeek; w <= endWeek + step / 2; w += step) {
-      const ideal = getIdealWeightRangeRef(Math.round(w), selectedReference);
-      idealMinPoints.push({ x: w, y: ideal.min });
-      idealMaxPoints.push({ x: w, y: ideal.max });
+      // True linear interpolation: find surrounding week data and interpolate
+      const wFloor = Math.floor(w);
+      const wFrac = w - wFloor;
+      
+      const p0 = refData.find((d) => d.week === wFloor);
+      const p1 = refData.find((d) => d.week === wFloor + 1);
+      
+      let minVal: number;
+      let maxVal: number;
+      
+      if (p0 && p1) {
+        minVal = p0.minKg + (p1.minKg - p0.minKg) * wFrac;
+        maxVal = p0.maxKg + (p1.maxKg - p0.maxKg) * wFrac;
+      } else if (p0) {
+        minVal = p0.minKg;
+        maxVal = p0.maxKg;
+      } else {
+        const first = refData[0];
+        minVal = first.minKg;
+        maxVal = first.maxKg;
+      }
+      
+      idealMinPoints.push({ x: w, y: Math.round(minVal * 100) / 100 });
+      idealMaxPoints.push({ x: w, y: Math.round(maxVal * 100) / 100 });
     }
 
     // 2. Actual measurements — each at its EXACT age in weeks
@@ -172,11 +205,10 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
       y: e.weightKg,
     }));
 
-    // 3. Projection — starts exactly from last measurement
+    // 3. Projection — starts from the week AFTER last measurement
+    // NO anchor point at same position as last real measurement (avoids stacked dots)
     const projectionPoints: Point[] = [];
-    if (actualPoints.length > 0) {
-      const last = actualPoints[actualPoints.length - 1];
-      projectionPoints.push({ x: last.x, y: last.y }); // anchor point
+    if (actualPoints.length > 0 && trend.projectedPoints.length > 0) {
       for (const proj of trend.projectedPoints) {
         if (proj.x <= endWeek) {
           projectionPoints.push({ x: proj.x, y: proj.y });
@@ -189,26 +221,26 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
         {
           label: "Fourchette idéale",
           data: idealMaxPoints as any,
-          borderColor: "rgba(192, 149, 108, 0.25)",
-          backgroundColor: "rgba(240, 226, 208, 0.35)",
+          borderColor: "rgba(192, 149, 108, 0.45)",
+          backgroundColor: "rgba(240, 226, 208, 0.5)",
           fill: {
             target: "-1" as any,
-            above: "rgba(240, 226, 208, 0.35)" as any,
+            above: "rgba(240, 226, 208, 0.5)" as any,
           },
-          borderWidth: 1,
+          borderWidth: 1.5,
           pointRadius: 0,
-          tension: 0.4,
+          tension: 0.35,
           order: 3,
           xAxisID: "x",
         },
         {
           label: "Fourchette idéale (min)",
           data: idealMinPoints as any,
-          borderColor: "rgba(192, 149, 108, 0.25)",
-          backgroundColor: "rgba(240, 226, 208, 0.35)",
-          borderWidth: 1,
+          borderColor: "rgba(192, 149, 108, 0.45)",
+          backgroundColor: "rgba(240, 226, 208, 0.5)",
+          borderWidth: 1.5,
           pointRadius: 0,
-          tension: 0.4,
+          tension: 0.35,
           order: 4,
           xAxisID: "x",
         },
@@ -232,8 +264,10 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
           label: "Projection (6 sem.)",
           data: projectionPoints as any,
           borderColor: "#6B8FA3",
+          backgroundColor: "rgba(107, 143, 163, 0.1)",
           borderWidth: 2,
           borderDash: [8, 4],
+          fill: "origin" as any,
           pointRadius: 0,
           pointHoverRadius: 4,
           tension: 0.3,
@@ -243,14 +277,19 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
         },
       ],
     };
-  }, [weightHistory, startWeek, endWeek, profile.birthDate, trend, timeRange]);
+  }, [weightHistory, startWeek, endWeek, profile.birthDate, trend, timeRange, selectedReference]);
+
+  // Dark mode colors for chart
+  const gridColor = isDark ? "rgba(245, 240, 232, 0.08)" : "rgba(45, 42, 38, 0.06)";
+  const tickColor = isDark ? "rgba(245, 240, 232, 0.5)" : "rgba(45, 42, 38, 0.5)";
+  const tooltipBg = isDark ? "#1E1D1B" : "#2D2A26";
 
   const chartOptions: ChartOptions<"line"> = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
-      mode: "index",
-      intersect: false,
+      mode: "nearest",
+      intersect: true,
     },
     plugins: {
       legend: {
@@ -265,11 +304,15 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
         },
       },
       tooltip: {
-        backgroundColor: "#2D2A26",
+        backgroundColor: tooltipBg,
         titleFont: { family: "'Inter', sans-serif", size: 13 },
         bodyFont: { family: "'Inter', sans-serif", size: 12 },
         padding: 12,
         cornerRadius: 8,
+        titleColor: isDark ? "#F5F0E8" : "#FFFFFF",
+        bodyColor: isDark ? "#F5F0E8" : "#FFFFFF",
+        borderColor: isDark ? "rgba(245,240,232,0.15)" : "transparent",
+        borderWidth: 1,
         displayColors: true,
         callbacks: {
           title: (items: any) => {
@@ -296,7 +339,7 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
         grid: { display: false },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
-          color: "rgba(45,42,38,0.5)",
+          color: tickColor,
           maxRotation: 0,
           autoSkip: false,
           callback: function (value) {
@@ -311,19 +354,19 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
           stepSize: 1,
           maxTicksLimit: 20,
         },
-        border: { color: "rgba(45,42,38,0.1)" },
+        border: { color: gridColor },
       },
       y: {
         min: yMin,
         max: yMax,
-        grid: { color: "rgba(45,42,38,0.05)" },
+        grid: { color: gridColor },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
-          color: "rgba(45,42,38,0.5)",
+          color: tickColor,
           callback: (value) => `${value} kg`,
           stepSize: Math.max(0.5, Math.round((yMax - yMin) / 6 * 10) / 10),
         },
-        border: { display: false },
+        border: { color: gridColor },
       },
     },
     animation: { duration: 500, easing: "easeOutQuart" },
@@ -407,7 +450,14 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
           )}
 
           {weightHistory.length > 0 && (
-            <div className="mt-4 pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--bm-border)" }}>
+            <>
+              <div className="mt-3 text-center">
+                <span className="text-xs font-medium px-3 py-1 rounded-full" style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}>
+                  Référentiel : {GROWTH_REFERENCES.find((r) => r.id === selectedReference)?.shortLabel || selectedReference}
+                </span>
+              </div>
+
+              <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--bm-border)" }}>
               <div className="flex items-center gap-2">
                 <span className="w-8 rounded" style={{ height: "8px", backgroundColor: "rgba(240,226,208,0.6)" }} />
                 <span className="text-xs" style={{ color: "var(--bm-text-secondary)" }}>Fourchette idéale (femelle Golden Retriever)</span>
@@ -421,6 +471,7 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
                 <span className="text-xs" style={{ color: "var(--bm-text-secondary)" }}>Projection (tendance sur 6 sem.)</span>
               </div>
             </div>
+          </>
           )}
         </motion.div>
 
