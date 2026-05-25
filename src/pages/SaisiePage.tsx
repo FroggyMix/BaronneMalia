@@ -11,6 +11,12 @@ interface SaisiePageProps {
   data: AppData;
   onAddWeight: (entry: Omit<WeightEntry, "id">) => void;
   onAddFeeding: (entry: Omit<FeedingEntry, "id">) => void;
+  selectedReference?: string;
+  onExport?: () => string;
+  onImport?: (json: string) => boolean;
+  onResetDemo?: () => void;
+  onClearAll?: () => void;
+  onUpdateReference?: (referenceId: string) => void;
 }
 
 type EntryType = "weight" | "feeding";
@@ -35,7 +41,7 @@ const BCS_DESCRIPTIONS: Record<number, string> = {
   9: "Sévèrement obèse — important dépôt de graisse",
 };
 
-export function SaisiePage({ data, onAddWeight, onAddFeeding }: SaisiePageProps) {
+export function SaisiePage({ data, onAddWeight, onAddFeeding, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: SaisiePageProps) {
   const [entryType, setEntryType] = useState<EntryType>("weight");
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -109,7 +115,7 @@ export function SaisiePage({ data, onAddWeight, onAddFeeding }: SaisiePageProps)
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
-      <Header title="Nouvelle saisie" showBack />
+      <Header title="Nouvelle saisie" showBack selectedReference={selectedReference} onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} onUpdateReference={onUpdateReference} />
 
       <main className="pt-20 px-5 max-w-lg mx-auto">
         <div className="rounded-xl p-1 shadow-sm flex mb-6" style={{ backgroundColor: "var(--bm-card-bg)" }}>

@@ -19,6 +19,12 @@ import type { AppData, NutritionAdvice } from "@/types";
 
 interface ConseilsPageProps {
   data: AppData;
+  selectedReference?: string;
+  onExport?: () => string;
+  onImport?: (json: string) => boolean;
+  onResetDemo?: () => void;
+  onClearAll?: () => void;
+  onUpdateReference?: (referenceId: string) => void;
 }
 
 const CATEGORY_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> = {
@@ -34,7 +40,7 @@ const PRIORITY_CONFIG = {
   low: { label: "À savoir", color: "#6B8FA3", bg: "#d0dce2" },
 };
 
-export function ConseilsPage({ data }: ConseilsPageProps) {
+export function ConseilsPage({ data, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: ConseilsPageProps) {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     personalized: true,
   });
@@ -71,7 +77,7 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
-      <Header title="Conseils & Nutrition" showBack />
+      <Header title="Conseils & Nutrition" showBack selectedReference={selectedReference} onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} onUpdateReference={onUpdateReference} />
 
       <main className="pt-20 px-5 max-w-lg mx-auto space-y-4">
         {currentWeight > 0 && (

@@ -143,11 +143,17 @@ function App() {
                   data={data}
                   onAddWeight={addWeightEntry}
                   onAddFeeding={addFeedingEntry}
+                  selectedReference={selectedReference}
+                  onExport={exportData}
+                  onImport={importData}
+                  onResetDemo={resetWithDemoData}
+                  onClearAll={clearAllData}
+                  onUpdateReference={updateReference}
                 />
               }
             />
-            <Route path="/courbe" element={<CourbePage data={data} selectedReference={selectedReference} onUpdateReference={updateReference} />} />
-            <Route path="/conseils" element={<ConseilsPage data={data} />} />
+            <Route path="/courbe" element={<CourbePage data={data} selectedReference={selectedReference} onExport={exportData} onImport={importData} onResetDemo={resetWithDemoData} onClearAll={clearAllData} onUpdateReference={updateReference} />} />
+            <Route path="/conseils" element={<ConseilsPage data={data} selectedReference={selectedReference} onExport={exportData} onImport={importData} onResetDemo={resetWithDemoData} onClearAll={clearAllData} onUpdateReference={updateReference} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <BottomNav />

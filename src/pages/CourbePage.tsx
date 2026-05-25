@@ -49,6 +49,10 @@ interface Point {
 interface CourbePageProps {
   data: AppData;
   selectedReference: string;
+  onExport?: () => string;
+  onImport?: (json: string) => boolean;
+  onResetDemo?: () => void;
+  onClearAll?: () => void;
   onUpdateReference?: (id: string) => void;
 }
 
@@ -80,7 +84,7 @@ function formatAgeLabel(weeks: number): string {
   return `${months}m${Math.round(remWeeks)}s`;
 }
 
-export function CourbePage({ data, selectedReference, onUpdateReference }: CourbePageProps) {
+export function CourbePage({ data, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: CourbePageProps) {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -385,7 +389,7 @@ export function CourbePage({ data, selectedReference, onUpdateReference }: Courb
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
-      <Header title="Courbe de croissance" showBack />
+      <Header title="Courbe de croissance" showBack selectedReference={selectedReference} onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} onUpdateReference={onUpdateReference} />
 
       <main className="pt-20 px-5 max-w-lg mx-auto space-y-4">
         {/* Time Range Filter */}
