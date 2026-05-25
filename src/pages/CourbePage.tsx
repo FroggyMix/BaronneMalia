@@ -49,6 +49,7 @@ interface Point {
 interface CourbePageProps {
   data: AppData;
   selectedReference: string;
+  onUpdateReference?: (id: string) => void;
 }
 
 type TimeRange = "all" | "6m" | "3m" | "1m";
@@ -79,11 +80,12 @@ function formatAgeLabel(weeks: number): string {
   return `${months}m${Math.round(remWeeks)}s`;
 }
 
-export function CourbePage({ data, selectedReference }: CourbePageProps) {
+export function CourbePage({ data, selectedReference, onUpdateReference }: CourbePageProps) {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains("dark"));
+  const [showRefSelector, setShowRefSelector] = useState(false);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -427,10 +429,45 @@ export function CourbePage({ data, selectedReference }: CourbePageProps) {
           {weightHistory.length > 0 && (
             <>
               <div className="mt-3 text-center">
-                <span className="text-xs font-medium px-3 py-1 rounded-full" style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}>
+                <button
+                  onClick={() => setShowRefSelector((s) => !s)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 transition-colors"
+                  style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}
+                >
                   Référentiel : {GROWTH_REFERENCES.find((r) => r.id === selectedReference)?.shortLabel || selectedReference}
-                </span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showRefSelector ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
               </div>
+
+              {showRefSelector && (
+                <div className="mt-2 rounded-xl p-3 space-y-1" style={{ backgroundColor: "var(--bm-surface)", border: "1px solid var(--bm-border)" }}>
+                  {GROWTH_REFERENCES.map((ref) => (
+                    <button
+                      key={ref.id}
+                      onClick={() => {
+                        onUpdateReference?.(ref.id);
+                        setShowRefSelector(false);
+                      }}
+                      className="w-full flex items-center gap-2 p-2 rounded-lg text-left transition-colors"
+                      style={selectedReference === ref.id ? { backgroundColor: "var(--bm-pale-gold)" } : {}}
+                      onMouseEnter={(e) => { if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "rgba(200,149,108,0.1)"; }}
+                      onMouseLeave={(e) => { if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "transparent"; }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium" style={{ color: "var(--bm-charcoal)" }}>{ref.shortLabel}</span>
+                          <span className="px-1 py-0 rounded text-[9px] font-medium" style={{ backgroundColor: ref.quality === 'A' || ref.quality === 'A-' ? '#D4E0CD' : '#F0E2D0', color: ref.quality === 'A' || ref.quality === 'A-' ? '#7A8B6E' : '#C8956C' }}>{ref.quality}</span>
+                          {ref.recommended && <span className="px-1 py-0 rounded text-[9px] font-medium" style={{ backgroundColor: 'var(--bm-pale-gold)', color: 'var(--bm-gold)' }}>✓</span>}
+                        </div>
+                      </div>
+                      {selectedReference === ref.id && (
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: "var(--bm-gold)" }} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--bm-border)" }}>
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "#C8956C" }} />

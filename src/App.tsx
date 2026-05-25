@@ -146,7 +146,7 @@ function App() {
                 />
               }
             />
-            <Route path="/courbe" element={<CourbePage data={data} selectedReference={selectedReference} />} />
+            <Route path="/courbe" element={<CourbePage data={data} selectedReference={selectedReference} onUpdateReference={updateReference} />} />
             <Route path="/conseils" element={<ConseilsPage data={data} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
