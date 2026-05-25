@@ -1,4 +1,4 @@
-import { ChevronLeft, Settings, Download, Upload, Trash2, AlertTriangle, Sun, Moon, Monitor } from "lucide-react";
+import { ChevronLeft, Settings, Download, Upload, Trash2, AlertTriangle, Sun, Moon, Monitor, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router";
 import { saveAs } from "file-saver";
@@ -24,7 +24,6 @@ import { GROWTH_REFERENCES } from "@/data/growthReferences";
 interface HeaderProps {
   title?: string;
   showBack?: boolean;
-  showSettings?: boolean;
   selectedReference?: string;
   onExport?: () => string;
   onImport?: (json: string) => boolean;
@@ -33,7 +32,44 @@ interface HeaderProps {
   onUpdateReference?: (referenceId: string) => void;
 }
 
-export function Header({ title, showBack, showSettings, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: HeaderProps) {
+interface CollapsibleSectionProps {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function CollapsibleSection({ title, defaultOpen = false, children }: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-xl shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 transition-colors rounded-xl"
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+      >
+        <h3 className="font-semibold text-sm" style={{ color: "var(--bm-charcoal)" }}>{title}</h3>
+        {isOpen ? (
+          <ChevronUp size={16} style={{ color: "var(--bm-text-secondary)" }} />
+        ) : (
+          <ChevronDown size={16} style={{ color: "var(--bm-text-secondary)" }} />
+        )}
+      </button>
+      {isOpen && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
+export function Header({
+  title,
+  showBack,
+  selectedReference,
+  onExport,
+  onImport,
+  onResetDemo,
+  onClearAll,
+  onUpdateReference,
+}: HeaderProps) {
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -64,7 +100,7 @@ export function Header({ title, showBack, showSettings, selectedReference, onExp
           setSettingsOpen(false);
           window.location.reload();
         } else {
-          setImportError("Format de fichier invalide. Veuillez sélectionner un fichier d'export Baronne Malia.");
+          setImportError("Format de fichier invalide. Veuillez selectionner un fichier d'export Baronne Malia.");
         }
       } catch {
         setImportError("Erreur lors de la lecture du fichier.");
@@ -75,7 +111,7 @@ export function Header({ title, showBack, showSettings, selectedReference, onExp
   };
 
   const themeIcon = theme === "dark" ? <Moon size={18} /> : theme === "light" ? <Sun size={18} /> : <Monitor size={18} />;
-  const themeLabel = theme === "dark" ? "Sombre" : theme === "light" ? "Clair" : "Système";
+  const themeLabel = theme === "dark" ? "Sombre" : theme === "light" ? "Clair" : "Systeme";
 
   return (
     <header
@@ -112,147 +148,154 @@ export function Header({ title, showBack, showSettings, selectedReference, onExp
             onClick={toggleTheme}
             className="p-2 -mr-1 rounded-full transition-colors"
             style={{ color: "var(--bm-text-secondary)" }}
-            title={`Thème: ${themeLabel}`}
+            title={`Theme: ${themeLabel}`}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
             {themeIcon}
           </button>
-          {showSettings && (
-            <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <SheetTrigger asChild>
-                <button
-                  className="p-2 -mr-2 rounded-full transition-colors"
-                  style={{ color: "var(--bm-text-secondary)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                >
-                  <Settings size={22} />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 border-l" style={{ backgroundColor: "var(--bm-cream)", borderColor: "var(--bm-border)" }}>
-                <SheetHeader>
-                  <SheetTitle className="font-bold text-lg" style={{ color: "var(--bm-charcoal)" }}>Paramètres</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  {/* Growth Reference section */}
-                  {onUpdateReference && (
-                    <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
-                      <h3 className="font-semibold mb-3" style={{ color: "var(--bm-charcoal)" }}>Référentiel de croissance</h3>
-                      <div className="space-y-2">
-                        {GROWTH_REFERENCES.map((ref) => (
-                          <button
-                            key={ref.id}
-                            onClick={() => onUpdateReference(ref.id)}
-                            className="w-full flex items-start gap-3 p-3 rounded-lg transition-colors text-left"
-                            style={
-                              selectedReference === ref.id
-                                ? { backgroundColor: "var(--bm-pale-gold)", border: "1px solid var(--bm-gold)" }
-                                : { backgroundColor: "transparent" }
-                            }
-                            onMouseEnter={(e) => {
-                              if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "var(--bm-surface)";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "transparent";
-                            }}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm" style={{ color: "var(--bm-charcoal)" }}>{ref.shortLabel}</span>
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{
-                                  backgroundColor: ref.quality === 'A' || ref.quality === 'A-' ? '#D4E0CD' : '#F0E2D0',
-                                  color: ref.quality === 'A' || ref.quality === 'A-' ? '#7A8B6E' : '#C8956C',
-                                }}>
-                                  {ref.quality}
-                                </span>
-                                {ref.recommended && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ backgroundColor: 'var(--bm-pale-gold)', color: 'var(--bm-gold)' }}>
-                                    Recommandé
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs mt-0.5" style={{ color: "var(--bm-text-tertiary)" }}>{ref.description}</p>
-                            </div>
-                            {selectedReference === ref.id && (
-                              <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: "var(--bm-gold)" }} />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+          {/* Settings button */}
+          <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <SheetTrigger asChild>
+              <button
+                className="p-2 -mr-2 rounded-full transition-colors"
+                style={{ color: "var(--bm-text-secondary)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              >
+                <Settings size={22} />
+              </button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-80 border-l flex flex-col"
+              style={{ backgroundColor: "var(--bm-cream)", borderColor: "var(--bm-border)", padding: 0 }}
+            >
+              {/* Fixed header */}
+              <SheetHeader className="px-5 pt-5 pb-3 flex-shrink-0">
+                <SheetTitle className="font-bold text-lg" style={{ color: "var(--bm-charcoal)" }}>
+                  Parametres
+                </SheetTitle>
+              </SheetHeader>
 
-                  {/* Theme section */}
-                  <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
-                    <h3 className="font-semibold mb-3" style={{ color: "var(--bm-charcoal)" }}>Thème</h3>
-                    <div className="flex gap-2">
-                      {([
-                        { value: "light" as const, label: "Clair", icon: Sun },
-                        { value: "dark" as const, label: "Sombre", icon: Moon },
-                        { value: "system" as const, label: "Auto", icon: Monitor },
-                      ]).map((t) => (
+              {/* Scrollable content */}
+              <div
+                className="flex-1 overflow-y-auto px-5 pb-8 space-y-3"
+                style={{ overscrollBehavior: "contain" }}
+              >
+                {/* Growth Reference section */}
+                {onUpdateReference && selectedReference && (
+                  <CollapsibleSection title="Referentiel de croissance" defaultOpen={true}>
+                    <div className="space-y-1.5">
+                      {GROWTH_REFERENCES.map((ref) => (
                         <button
-                          key={t.value}
-                          onClick={() => {
-                            if (t.value === "light" || t.value === "dark" || t.value === "system") {
-                              toggleTheme();
-                            }
-                          }}
-                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                            theme === t.value
-                              ? "shadow-sm"
-                              : "border hover:opacity-80"
-                          }`}
+                          key={ref.id}
+                          onClick={() => onUpdateReference(ref.id)}
+                          className="w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left"
                           style={
-                            theme === t.value
-                              ? { backgroundColor: "var(--bm-gold)", color: "#fff", borderColor: "transparent" }
-                              : { backgroundColor: "var(--bm-surface)", color: "var(--bm-text-secondary)", borderColor: "var(--bm-border)" }
+                            selectedReference === ref.id
+                              ? { backgroundColor: "var(--bm-pale-gold)" }
+                              : {}
                           }
+                          onMouseEnter={(e) => {
+                            if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "var(--bm-surface)";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "transparent";
+                          }}
                         >
-                          <t.icon size={16} />
-                          {t.label}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-xs" style={{ color: "var(--bm-charcoal)" }}>
+                                {ref.shortLabel}
+                              </span>
+                              <span
+                                className="px-1 py-0 rounded text-[9px] font-medium"
+                                style={{
+                                  backgroundColor: ref.quality === "A" || ref.quality === "A-" ? "#D4E0CD" : "#F0E2D0",
+                                  color: ref.quality === "A" || ref.quality === "A-" ? "#7A8B6E" : "#C8956C",
+                                }}
+                              >
+                                {ref.quality}
+                              </span>
+                              {ref.recommended && (
+                                <span
+                                  className="px-1 py-0 rounded text-[9px] font-medium"
+                                  style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}
+                                >
+                                  recommande
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] leading-tight mt-0.5" style={{ color: "var(--bm-text-tertiary)" }}>
+                              {ref.description}
+                            </p>
+                          </div>
+                          {selectedReference === ref.id && (
+                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: "var(--bm-gold)" }} />
+                          )}
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </CollapsibleSection>
+                )}
 
-                  <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
-                    <h3 className="font-semibold mb-3" style={{ color: "var(--bm-charcoal)" }}>Données</h3>
-                    <div className="space-y-2">
+                {/* Theme section */}
+                <CollapsibleSection title="Theme" defaultOpen={false}>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "light" as const, label: "Clair", icon: Sun },
+                      { value: "dark" as const, label: "Sombre", icon: Moon },
+                      { value: "system" as const, label: "Auto", icon: Monitor },
+                    ].map((t) => (
+                      <button
+                        key={t.value}
+                        onClick={() => toggleTheme()}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        style={
+                          theme === t.value
+                            ? { backgroundColor: "var(--bm-gold)", color: "#fff" }
+                            : { backgroundColor: "var(--bm-surface)", color: "var(--bm-text-secondary)", border: "1px solid var(--bm-border)" }
+                        }
+                      >
+                        <t.icon size={14} />
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </CollapsibleSection>
+
+                {/* Data section */}
+                {(onExport || onImport || onResetDemo) && (
+                  <CollapsibleSection title="Donnees" defaultOpen={false}>
+                    <div className="space-y-1">
                       {onExport && (
                         <button
                           onClick={handleExport}
-                          className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left"
+                          className="w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left text-xs"
                           style={{ color: "var(--bm-charcoal)" }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                         >
-                          <Download size={18} style={{ color: "var(--bm-gold)" }} />
-                          <span className="text-sm">Exporter les données (JSON)</span>
+                          <Download size={14} style={{ color: "var(--bm-gold)" }} />
+                          Exporter les donnees (JSON)
                         </button>
                       )}
                       {onImport && (
                         <>
                           <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left"
+                            className="w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left text-xs"
                             style={{ color: "var(--bm-charcoal)" }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                           >
-                            <Upload size={18} style={{ color: "#6B8FA3" }} />
-                            <span className="text-sm">Importer des données</span>
+                            <Upload size={14} style={{ color: "#6B8FA3" }} />
+                            Importer des donnees
                           </button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".json"
-                            onChange={handleImport}
-                            className="hidden"
-                          />
+                          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
                           {importError && (
-                            <p className="text-xs mt-1 px-3 text-[#C06B5A]">{importError}</p>
+                            <p className="text-xs text-[#C06B5A] px-2">{importError}</p>
                           )}
                         </>
                       )}
@@ -262,45 +305,43 @@ export function Header({ title, showBack, showSettings, selectedReference, onExp
                             onResetDemo();
                             setSettingsOpen(false);
                           }}
-                          className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left"
+                          className="w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left text-xs"
                           style={{ color: "var(--bm-charcoal)" }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                         >
-                          <Upload size={18} style={{ color: "#7A8B6E" }} />
-                          <span className="text-sm">Charger les données de démo</span>
+                          <Upload size={14} style={{ color: "#7A8B6E" }} />
+                          Charger les donnees de demo
                         </button>
                       )}
                     </div>
-                  </div>
+                  </CollapsibleSection>
+                )}
 
-                  {onClearAll && (
-                    <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
-                      <h3 className="font-semibold mb-3" style={{ color: "var(--bm-charcoal)" }}>Zone dangereuse</h3>
-                      <button
-                        onClick={() => setClearDialogOpen(true)}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left"
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                      >
-                        <Trash2 size={18} className="text-[#C06B5A]" />
-                        <span className="text-sm text-[#C06B5A]">Tout effacer</span>
-                      </button>
-                    </div>
-                  )}
+                {/* Danger zone */}
+                {onClearAll && (
+                  <CollapsibleSection title="Zone dangereuse" defaultOpen={false}>
+                    <button
+                      onClick={() => setClearDialogOpen(true)}
+                      className="w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left text-xs"
+                    >
+                      <Trash2 size={14} className="text-[#C06B5A]" />
+                      <span className="text-[#C06B5A]">Tout effacer</span>
+                    </button>
+                  </CollapsibleSection>
+                )}
 
-                  <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
-                    <h3 className="font-semibold mb-2" style={{ color: "var(--bm-charcoal)" }}>À propos</h3>
-                    <p className="text-xs leading-relaxed" style={{ color: "var(--bm-text-secondary)" }}>
-                      Baronne Malia — Suivi de croissance pour Golden Retriever.
-                      Données basées sur FEDIAF 2024, NRC 2006, et les standards vétérinaires.
-                      Version 2.1.0
-                    </p>
-                  </div>
+                {/* About */}
+                <div className="rounded-xl p-3" style={{ backgroundColor: "var(--bm-card-bg)" }}>
+                  <p className="text-[10px] leading-relaxed" style={{ color: "var(--bm-text-tertiary)" }}>
+                    Baronne Malia — Suivi de croissance Golden Retriever.
+                    Donnees : FEDIAF 2024, NRC 2006, WALTHAM, AKC/GRCA.
+                    v2.2.0
+                  </p>
                 </div>
-              </SheetContent>
-            </Sheet>
-          )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
@@ -312,11 +353,11 @@ export function Header({ title, showBack, showSettings, selectedReference, onExp
               Confirmer la suppression
             </DialogTitle>
             <DialogDescription style={{ color: "var(--bm-text-secondary)" }}>
-              Cette action est irréversible. Toutes les données de poids et d'alimentation seront supprimées.
+              Cette action est irreversible. Toutes les donnees seront supprimees.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setClearDialogOpen(false)} className="border-[rgba(45,42,38,0.2)]">
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>
               Annuler
             </Button>
             <Button

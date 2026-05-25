@@ -113,7 +113,7 @@ export function HomePage({ data, selectedReference, onExport, onImport, onResetD
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
-      <Header showSettings selectedReference={selectedReference} onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} onUpdateReference={(id) => updateReference?.(id)} />
+      <Header selectedReference={selectedReference} onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} onUpdateReference={(id) => updateReference?.(id)} />
 
       <main className="pt-20 px-5 max-w-lg mx-auto space-y-4">
         {/* Profile Card */}
