@@ -1,10 +1,28 @@
-import { differenceInWeeks, differenceInMonths } from "date-fns";
+import { differenceInDays, differenceInWeeks, differenceInMonths } from "date-fns";
 import { getIdealWeightRange, getWeightStatus as _getWeightStatus, getWeightStatusLabel as _getWeightStatusLabel } from "@/data/growthCurve";
 import type { WeightEntry } from "@/types";
 
 // Re-export for convenience
 export const getWeightStatus = _getWeightStatus;
 export const getWeightStatusLabel = _getWeightStatusLabel;
+
+/**
+ * Get age in days (precise, for chart positioning)
+ */
+export function getAgeInDays(birthDate: string, referenceDate?: string): number {
+  const birth = new Date(birthDate);
+  const ref = referenceDate ? new Date(referenceDate) : new Date();
+  return differenceInDays(ref, birth);
+}
+
+/**
+ * Get age in weeks with decimal precision (for chart X-axis)
+ * Returns exact value: 10.4 weeks = 10 weeks + 3 days
+ */
+export function getAgeInWeeksDecimal(birthDate: string, referenceDate?: string): number {
+  const days = getAgeInDays(birthDate, referenceDate);
+  return days / 7;
+}
 
 /**
  * Calculate Resting Energy Requirement (RER)
