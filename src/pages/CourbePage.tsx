@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -16,9 +16,20 @@ import {
 import { Line } from "react-chartjs-2";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { TrendingUp, TrendingDown, Minus, Scale, Calendar, Target, ChevronLeft, ChevronRight, FileSpreadsheet, Download } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Scale,
+  Calendar,
+  Target,
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet,
+  Download,
+} from "lucide-react";
 import { Header } from "@/components/Header";
-import { getIdealWeightRange } from "@/data/growthCurve";
+import { getIdealWeightRangeRef } from "@/data/growthReferences";
 import {
   getAgeInWeeks,
   getWeightStats,
@@ -26,12 +37,18 @@ import {
   getWeightStatus,
   getWeightStatusLabel,
 } from "@/utils/calculations";
-import type { AppData, WeightEntry } from "@/types";
+import type { AppData } from "@/types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
+interface Point {
+  x: number;
+  y: number;
+}
+
 interface CourbePageProps {
   data: AppData;
+  selectedReference: string;
 }
 
 type TimeRange = "all" | "6m" | "3m" | "1m";
@@ -54,140 +71,150 @@ const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> =
 
 const ITEMS_PER_PAGE = 10;
 
-export function CourbePage({ data }: CourbePageProps) {
+/** Format week number to human-readable age label */
+function formatAgeLabel(weeks: number, detailed: boolean): string {
+  const months = Math.floor(weeks / 4);
+  const remWeeks = weeks % 4;
+  if (remWeeks === 0) return `${months}m`;
+  if (detailed) return `${months}m${remWeeks}s`;
+  return "";
+}
+
+export function CourbePage({ data, selectedReference }: CourbePageProps) {
   const navigate = useNavigate();
-  const chartRef = useRef<ChartJS<"line">>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { profile, weightHistory } = data;
   const ageWeeks = getAgeInWeeks(profile.birthDate);
   const stats = getWeightStats(weightHistory);
-  const trend = projectWeightTrend(weightHistory, 6);
+  const trend = projectWeightTrend(weightHistory, profile.birthDate, 6);
   const currentWeight = stats.currentWeight || 0;
   const weightStatus = getWeightStatus(currentWeight, ageWeeks);
-  const idealRange = getIdealWeightRange(ageWeeks);
+  const idealRange = getIdealWeightRangeRef(ageWeeks, selectedReference);
 
-  // Compute zoom window (in weeks)
-  const zoomWindow = useMemo(() => {
-    const endWeek = ageWeeks + 2; // +2 for slight padding
-    let startWeek: number;
+  // X-axis zoom window (in weeks since birth)
+  const { startWeek, endWeek } = useMemo(() => {
+    const end = ageWeeks + 4; // show a little past current age
+    let start: number;
     switch (timeRange) {
       case "1m":
-        startWeek = Math.max(8, ageWeeks - 4);
+        start = Math.max(8, ageWeeks - 5);
         break;
       case "3m":
-        startWeek = Math.max(8, ageWeeks - 13);
+        start = Math.max(8, ageWeeks - 14);
         break;
       case "6m":
-        startWeek = Math.max(8, ageWeeks - 26);
+        start = Math.max(8, ageWeeks - 27);
         break;
       default:
-        startWeek = 8;
+        start = 8; // from 2 months
     }
-    return { startWeek, endWeek };
+    return { startWeek: start, endWeek: end };
   }, [ageWeeks, timeRange]);
 
-  // Build chart data WITHIN the zoom window only
-  const chartData = useMemo((): ChartData<"line"> => {
-    if (weightHistory.length === 0) {
-      return { labels: [], datasets: [] };
+  // Compute Y range from visible data
+  const { yMin, yMax } = useMemo(() => {
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+
+    // Ideal range
+    for (let w = startWeek; w <= endWeek; w += 1) {
+      const ideal = getIdealWeightRangeRef(w, selectedReference);
+      minVal = Math.min(minVal, ideal.min);
+      maxVal = Math.max(maxVal, ideal.max);
     }
 
-    const { startWeek, endWeek } = zoomWindow;
-
-    const labels: string[] = [];
-    const idealMinData: (number | null)[] = [];
-    const idealMaxData: (number | null)[] = [];
-    const actualData: (number | null)[] = [];
-    const projectedData: (number | null)[] = [];
-
-    const lastEntry = weightHistory[weightHistory.length - 1];
-    const lastEntryWeek = getAgeInWeeks(profile.birthDate, lastEntry.date);
-
-    // Step size: every 1 week for zoomed views, every 2 weeks for "all"
-    const step = timeRange === "all" ? 2 : 1;
-
-    for (let w = startWeek; w <= endWeek; w += step) {
-      // Label: show month marker every 4 weeks
-      const month = Math.floor(w / 4);
-      const weekInMonth = w % 4;
-      if (weekInMonth === 0) {
-        labels.push(`${month}m`);
-      } else if (timeRange !== "all" && (w === startWeek || w === endWeek)) {
-        // Show start/end labels for zoomed views
-        labels.push(`${month}m${weekInMonth}`);
-      } else {
-        labels.push("");
+    // Actual measurements within window
+    weightHistory.forEach((e) => {
+      const w = getAgeInWeeks(profile.birthDate, e.date);
+      if (w >= startWeek && w <= endWeek) {
+        minVal = Math.min(minVal, e.weightKg);
+        maxVal = Math.max(maxVal, e.weightKg);
       }
+    });
 
-      // Ideal range (always show up to 78 weeks, then plateau)
-      if (w <= 78) {
-        const ideal = getIdealWeightRange(w);
-        idealMinData.push(ideal.min);
-        idealMaxData.push(ideal.max);
-      } else {
-        // For adult ages beyond 78 weeks, use the mature plateau
-        idealMinData.push(25.0);
-        idealMaxData.push(30.0);
+    // Projections within window
+    trend.projectedPoints.forEach((p) => {
+      if (p.x >= startWeek && p.x <= endWeek) {
+        minVal = Math.min(minVal, p.y);
+        maxVal = Math.max(maxVal, p.y);
       }
+    });
 
-      // Actual data: find entry closest to this week
-      const entryForWeek = weightHistory.reduce<WeightEntry | null>((closest, e) => {
-        const entryWeek = getAgeInWeeks(profile.birthDate, e.date);
-        if (Math.abs(entryWeek - w) <= Math.abs(getAgeInWeeks(profile.birthDate, closest?.date || e.date) - w)) {
-          return Math.abs(entryWeek - w) <= 1 ? e : closest;
+    const padding = (maxVal - minVal) * 0.12;
+    return {
+      yMin: Math.max(0, Math.floor((minVal - padding) * 10) / 10),
+      yMax: Math.ceil((maxVal + padding) * 10) / 10,
+    };
+  }, [startWeek, endWeek, weightHistory, profile.birthDate, trend]);
+
+  // Build datasets with EXACT coordinates
+  const chartData = useMemo((): ChartData<"line"> => {
+    if (weightHistory.length === 0) return { labels: [], datasets: [] };
+
+    // 1. Ideal range — dense interpolated curve
+    const idealMinPoints: Point[] = [];
+    const idealMaxPoints: Point[] = [];
+    const step = 0.5; // half-week steps for smooth curve
+    for (let w = startWeek; w <= endWeek + step / 2; w += step) {
+      const ideal = getIdealWeightRangeRef(Math.round(w), selectedReference);
+      idealMinPoints.push({ x: w, y: ideal.min });
+      idealMaxPoints.push({ x: w, y: ideal.max });
+    }
+
+    // 2. Actual measurements — each at its EXACT age in weeks
+    const sortedEntries = [...weightHistory].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const actualPoints: Point[] = sortedEntries.map((e) => ({
+      x: getAgeInWeeks(profile.birthDate, e.date),
+      y: e.weightKg,
+    }));
+
+    // 3. Projection — starts exactly from last measurement
+    const projectionPoints: Point[] = [];
+    if (actualPoints.length > 0) {
+      const last = actualPoints[actualPoints.length - 1];
+      projectionPoints.push({ x: last.x, y: last.y }); // anchor point
+      for (const proj of trend.projectedPoints) {
+        if (proj.x <= endWeek) {
+          projectionPoints.push({ x: proj.x, y: proj.y });
         }
-        return closest;
-      }, null);
-
-      // Only show actual data points if they fall within the zoom window
-      const closestEntryWeek = entryForWeek ? getAgeInWeeks(profile.birthDate, entryForWeek.date) : -999;
-      actualData.push(
-        entryForWeek && closestEntryWeek >= startWeek - 1 && closestEntryWeek <= endWeek + 1
-          ? entryForWeek.weightKg
-          : null
-      );
-
-      // Projection data
-      if (w > lastEntryWeek && trend.projectedWeights.length > 0) {
-        const projWeek = w - lastEntryWeek;
-        const proj = trend.projectedWeights.find((p) => p.week === projWeek);
-        projectedData.push(proj ? proj.weight : null);
-      } else if (w === lastEntryWeek) {
-        projectedData.push(lastEntry.weightKg);
-      } else {
-        projectedData.push(null);
       }
     }
 
     return {
-      labels,
       datasets: [
         {
-          label: "Fourchette idéale (max)",
-          data: idealMaxData,
-          borderColor: "rgba(192, 149, 108, 0.3)",
-          backgroundColor: "rgba(240, 226, 208, 0.4)",
-          fill: "-1",
+          label: "Fourchette idéale",
+          data: idealMaxPoints as any,
+          borderColor: "rgba(192, 149, 108, 0.25)",
+          backgroundColor: "rgba(240, 226, 208, 0.35)",
+          fill: {
+            target: "-1" as any,
+            above: "rgba(240, 226, 208, 0.35)" as any,
+          },
           borderWidth: 1,
           pointRadius: 0,
           tension: 0.4,
           order: 3,
+          xAxisID: "x",
         },
         {
           label: "Fourchette idéale (min)",
-          data: idealMinData,
-          borderColor: "rgba(192, 149, 108, 0.3)",
-          backgroundColor: "rgba(240, 226, 208, 0.4)",
+          data: idealMinPoints as any,
+          borderColor: "rgba(192, 149, 108, 0.25)",
+          backgroundColor: "rgba(240, 226, 208, 0.35)",
           borderWidth: 1,
           pointRadius: 0,
           tension: 0.4,
           order: 4,
+          xAxisID: "x",
         },
         {
           label: "Poids réel",
-          data: actualData,
+          data: actualPoints as any,
           borderColor: "#C8956C",
           backgroundColor: "#C8956C",
           borderWidth: 2.5,
@@ -199,51 +226,24 @@ export function CourbePage({ data }: CourbePageProps) {
           tension: 0.3,
           spanGaps: false,
           order: 1,
+          xAxisID: "x",
         },
         {
           label: "Projection (6 sem.)",
-          data: projectedData,
+          data: projectionPoints as any,
           borderColor: "#6B8FA3",
           borderWidth: 2,
           borderDash: [8, 4],
           pointRadius: 0,
           pointHoverRadius: 4,
           tension: 0.3,
+          spanGaps: false,
           order: 2,
+          xAxisID: "x",
         },
       ],
     };
-  }, [weightHistory, zoomWindow, profile.birthDate, ageWeeks, trend, profile, timeRange]);
-
-  // Dynamic Y axis based on visible data
-  const yAxisRange = useMemo(() => {
-    const { startWeek, endWeek } = zoomWindow;
-    let minVal = Infinity;
-    let maxVal = -Infinity;
-
-    // Check ideal range
-    for (let w = startWeek; w <= endWeek; w++) {
-      const ideal = getIdealWeightRange(w);
-      minVal = Math.min(minVal, ideal.min);
-      maxVal = Math.max(maxVal, ideal.max);
-    }
-
-    // Check actual data within window
-    weightHistory.forEach((e) => {
-      const w = getAgeInWeeks(profile.birthDate, e.date);
-      if (w >= startWeek && w <= endWeek) {
-        minVal = Math.min(minVal, e.weightKg);
-        maxVal = Math.max(maxVal, e.weightKg);
-      }
-    });
-
-    // Add padding
-    const padding = (maxVal - minVal) * 0.15;
-    return {
-      min: Math.max(0, Math.floor(minVal - padding)),
-      max: Math.ceil(maxVal + padding),
-    };
-  }, [zoomWindow, weightHistory, profile.birthDate]);
+  }, [weightHistory, startWeek, endWeek, profile.birthDate, trend, timeRange]);
 
   const chartOptions: ChartOptions<"line"> = {
     responsive: true,
@@ -259,14 +259,9 @@ export function CourbePage({ data }: CourbePageProps) {
           usePointStyle: true,
           pointStyleWidth: 10,
           padding: 20,
-          font: {
-            family: "'Inter', sans-serif",
-            size: 12,
-          },
+          font: { family: "'Inter', sans-serif", size: 12 },
           color: "rgba(45,42,38,0.7)",
-          filter: (item) => {
-            return item.text !== "Fourchette idéale (max)";
-          },
+          filter: (item) => item.text !== "Fourchette idéale (min)",
         },
       },
       tooltip: {
@@ -276,51 +271,72 @@ export function CourbePage({ data }: CourbePageProps) {
         padding: 12,
         cornerRadius: 8,
         displayColors: true,
+        callbacks: {
+          title: (items: any) => {
+            if (!items.length) return "";
+            const week = Math.round(Number(items[0].raw.x));
+            return `Âge : ${formatAgeLabel(week, true)}`;
+          },
+          label: (item: any) => {
+            const val = item.raw.y;
+            if (item.dataset.label === "Poids réel") return `Poids : ${val} kg`;
+            if (item.dataset.label === "Projection (6 sem.)") return `Projection : ${val} kg`;
+            // Hide ideal range from tooltip
+            if (item.dataset.label?.includes("Fourchette")) return undefined;
+            return "";
+          },
+        },
       },
     },
     scales: {
       x: {
+        type: "linear",
+        min: startWeek,
+        max: endWeek,
         grid: { display: false },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: "rgba(45,42,38,0.5)",
           maxRotation: 0,
-          autoSkip: true,
-          maxTicksLimit: timeRange === "all" ? 12 : 6,
+          autoSkip: false,
+          callback: function (value) {
+            const week = Math.round(Number(value));
+            const remWeeks = week % 4;
+            // Show label at every month boundary (week divisible by 4)
+            if (remWeeks === 0) return formatAgeLabel(week, false);
+            // For 1-month zoom, also show mid-month markers
+            if (timeRange === "1m" && remWeeks === 2) return formatAgeLabel(week, true);
+            return "";
+          },
+          stepSize: 1,
+          maxTicksLimit: 20,
         },
         border: { color: "rgba(45,42,38,0.1)" },
       },
       y: {
-        min: yAxisRange.min,
-        max: yAxisRange.max,
+        min: yMin,
+        max: yMax,
         grid: { color: "rgba(45,42,38,0.05)" },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: "rgba(45,42,38,0.5)",
           callback: (value) => `${value} kg`,
-          stepSize: Math.max(1, Math.round((yAxisRange.max - yAxisRange.min) / 8)),
+          stepSize: Math.max(0.5, Math.round((yMax - yMin) / 6 * 10) / 10),
         },
         border: { display: false },
       },
     },
-    animation: {
-      duration: 600,
-      easing: "easeOutQuart",
-    },
+    animation: { duration: 500, easing: "easeOutQuart" },
   };
 
-  // Pagination for weight history
+  // Pagination
   const sortedEntries = useMemo(() => {
     return [...weightHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [weightHistory]);
-
   const totalPages = Math.max(1, Math.ceil(sortedEntries.length / ITEMS_PER_PAGE));
-  const paginatedEntries = sortedEntries.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const paginatedEntries = sortedEntries.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // CSV Export
+  // CSV export
   const exportCSV = () => {
     const sorted = [...weightHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const headers = ["Date", "Age (semaines)", "Poids (kg)", "BCS", "Notes"];
@@ -348,7 +364,7 @@ export function CourbePage({ data }: CourbePageProps) {
   const trendColor = trendEntry.color;
 
   return (
-    <div className="min-h-screen bg-[#FAF6F0] pb-24">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
       <Header title="Courbe de croissance" showBack />
 
       <main className="pt-20 px-5 max-w-lg mx-auto space-y-4">
@@ -357,147 +373,102 @@ export function CourbePage({ data }: CourbePageProps) {
           {TIME_RANGES.map((range) => (
             <button
               key={range.value}
-              onClick={() => {
-                setTimeRange(range.value);
-                setCurrentPage(1);
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+              onClick={() => { setTimeRange(range.value); setCurrentPage(1); }}
+              className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200"
+              style={
                 timeRange === range.value
-                  ? "bg-[#C8956C] text-white shadow-sm"
-                  : "bg-white text-[rgba(45,42,38,0.6)] border border-[rgba(45,42,38,0.1)] shadow-sm hover:bg-[#FAF6F0]"
-              }`}
+                  ? { backgroundColor: "var(--bm-gold)", color: "#fff" }
+                  : { backgroundColor: "var(--bm-card-bg)", color: "var(--bm-text-secondary)", border: "1px solid var(--bm-border)" }
+              }
             >
               {range.label}
             </button>
           ))}
         </div>
 
-        {/* Chart Card */}
+        {/* Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl p-4 shadow-md"
+          className="rounded-2xl p-4 shadow-md"
+          style={{ backgroundColor: "var(--bm-card-bg)" }}
         >
           {weightHistory.length > 0 ? (
             <div className="h-72">
-              <Line ref={chartRef} data={chartData} options={chartOptions} />
+              <Line data={chartData as any} options={chartOptions as any} />
             </div>
           ) : (
             <div className="h-72 flex items-center justify-center flex-col gap-3">
-              <Scale size={40} className="text-[rgba(45,42,38,0.2)]" />
-              <p className="text-sm text-[rgba(45,42,38,0.5)] text-center">
+              <Scale size={40} style={{ color: "var(--bm-text-tertiary)", opacity: 0.5 }} />
+              <p className="text-sm text-center" style={{ color: "var(--bm-text-secondary)" }}>
                 Saisissez au moins 2 pesées pour voir la courbe
               </p>
             </div>
           )}
 
           {weightHistory.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-[rgba(45,42,38,0.08)] space-y-1.5">
+            <div className="mt-4 pt-3 space-y-1.5" style={{ borderTop: "1px solid var(--bm-border)" }}>
               <div className="flex items-center gap-2">
-                <span className="w-8 rounded" style={{ height: "8px", backgroundColor: "rgba(240, 226, 208, 0.6)" }} />
-                <span className="text-xs text-[rgba(45,42,38,0.6)]">Fourchette idéale (femelle Golden Retriever)</span>
+                <span className="w-8 rounded" style={{ height: "8px", backgroundColor: "rgba(240,226,208,0.6)" }} />
+                <span className="text-xs" style={{ color: "var(--bm-text-secondary)" }}>Fourchette idéale (femelle Golden Retriever)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#C8956C]" />
-                <span className="text-xs text-[rgba(45,42,38,0.6)]">Poids réel</span>
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "#C8956C" }} />
+                <span className="text-xs" style={{ color: "var(--bm-text-secondary)" }}>Poids réel</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-8 border-t-2 border-dashed border-[#6B8FA3]" />
-                <span className="text-xs text-[rgba(45,42,38,0.6)]">Projection (tendance sur 6 sem.)</span>
+                <span className="w-8 border-t-2 border-dashed" style={{ borderColor: "#6B8FA3" }} />
+                <span className="text-xs" style={{ color: "var(--bm-text-secondary)" }}>Projection (tendance sur 6 sem.)</span>
               </div>
             </div>
           )}
         </motion.div>
 
-        {/* Stats Card */}
+        {/* Stats */}
         {weightHistory.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl p-5 shadow-md"
+            className="rounded-2xl p-5 shadow-md"
+            style={{ backgroundColor: "var(--bm-card-bg)" }}
           >
-            <h3 className="text-sm font-medium text-[rgba(45,42,38,0.6)] uppercase tracking-wider mb-4">
-              Statistiques
-            </h3>
+            <h3 className="text-sm font-medium uppercase tracking-wider mb-4" style={{ color: "var(--bm-text-secondary)" }}>Statistiques</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-[#FAF6F0] rounded-xl">
-                <div className="flex items-center gap-2 mb-1">
-                  <Scale size={14} className="text-[#C8956C]" />
-                  <span className="text-xs text-[rgba(45,42,38,0.5)]">Poids de départ</span>
+              {[
+                { icon: Scale, color: "var(--bm-gold)", label: "Poids de départ", value: `${stats.startingWeight} kg`, sub: stats.startingDate ? format(new Date(stats.startingDate), "d MMM yyyy", { locale: fr }) : undefined },
+                { icon: TrendingUp, color: "#7A8B6E", label: "Gain total", value: `+${stats.totalGain} kg` },
+                { icon: Calendar, color: "#6B8FA3", label: "Pesées", value: `${stats.weighingsCount}`, sub: `sur ${stats.weeksTracked} semaines` },
+                { icon: Target, color: "var(--bm-gold)", label: "Fourchette idéale", value: `${idealRange.min}-${idealRange.max} kg`, sub: getWeightStatusLabel(weightStatus) },
+              ].map((s, i) => (
+                <div key={i} className="p-3 rounded-xl" style={{ backgroundColor: "var(--bm-surface)" }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <s.icon size={14} style={{ color: s.color }} />
+                    <span className="text-xs" style={{ color: "var(--bm-text-tertiary)" }}>{s.label}</span>
+                  </div>
+                  <p className="text-xl font-bold" style={{ color: "var(--bm-charcoal)" }}>{s.value}</p>
+                  {s.sub && <p className="text-xs" style={{ color: "var(--bm-text-tertiary)" }}>{s.sub}</p>}
                 </div>
-                <p className="text-xl font-bold text-[#2D2A26]">
-                  {stats.startingWeight} <span className="text-sm font-normal">kg</span>
-                </p>
-                {stats.startingDate && (
-                  <p className="text-xs text-[rgba(45,42,38,0.5)]">
-                    {format(new Date(stats.startingDate), "d MMM yyyy", { locale: fr })}
-                  </p>
-                )}
-              </div>
-
-              <div className="p-3 bg-[#FAF6F0] rounded-xl">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp size={14} className="text-[#7A8B6E]" />
-                  <span className="text-xs text-[rgba(45,42,38,0.5)]">Gain total</span>
-                </div>
-                <p className="text-xl font-bold text-[#2D2A26]">
-                  +{stats.totalGain} <span className="text-sm font-normal">kg</span>
-                </p>
-              </div>
-
-              <div className="p-3 bg-[#FAF6F0] rounded-xl">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calendar size={14} className="text-[#6B8FA3]" />
-                  <span className="text-xs text-[rgba(45,42,38,0.5)]">Pesées</span>
-                </div>
-                <p className="text-xl font-bold text-[#2D2A26]">{stats.weighingsCount}</p>
-                <p className="text-xs text-[rgba(45,42,38,0.5)]">sur {stats.weeksTracked} semaines</p>
-              </div>
-
-              <div className="p-3 bg-[#FAF6F0] rounded-xl">
-                <div className="flex items-center gap-2 mb-1">
-                  <Target size={14} className="text-[#C8956C]" />
-                  <span className="text-xs text-[rgba(45,42,38,0.5)]">Fourchette idéale</span>
-                </div>
-                <p className="text-lg font-bold text-[#2D2A26]">
-                  {idealRange.min}-{idealRange.max} <span className="text-sm font-normal">kg</span>
-                </p>
-                <p className="text-xs text-[rgba(45,42,38,0.5)]">
-                  {getWeightStatusLabel(weightStatus)}
-                </p>
-              </div>
+              ))}
             </div>
 
             {weightHistory.length >= 3 && (
-              <div className="mt-4 p-3 rounded-xl border-l-4" style={{ borderLeftColor: trendColor, backgroundColor: "#FAF6F0" }}>
-                <div className="flex items-center gap-2">
+              <div className="mt-4 p-3 rounded-xl border-l-4" style={{ borderLeftColor: trendColor, backgroundColor: "var(--bm-surface)" }}>
+                <div className="flex items-center gap-2 flex-wrap">
                   <TrendIcon size={18} style={{ color: trendColor }} />
-                  <span className="font-medium text-sm text-[#2D2A26]">{trend.trendDescription}</span>
-                  <span className="text-sm text-[rgba(45,42,38,0.6)]">
-                    ({trend.trendRate > 0 ? "+" : ""}
-                    {trend.trendRate} kg/mois)
-                  </span>
+                  <span className="font-medium text-sm" style={{ color: "var(--bm-charcoal)" }}>{trend.trendDescription}</span>
+                  <span className="text-sm" style={{ color: "var(--bm-text-secondary)" }}>({trend.trendRate > 0 ? "+" : ""}{trend.trendRate} kg/mois)</span>
                 </div>
               </div>
             )}
           </motion.div>
         )}
 
-        {/* Export Buttons */}
+        {/* Export buttons */}
         {weightHistory.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="flex gap-3"
-          >
-            <button
-              onClick={exportCSV}
-              className="flex-1 bg-white hover:bg-[#FAF6F0] text-[#2D2A26] rounded-xl py-3 px-4 shadow-sm border border-[rgba(45,42,38,0.1)] flex items-center justify-center gap-2 transition-colors text-sm font-medium"
-            >
-              <FileSpreadsheet size={16} className="text-[#7A8B6E]" />
-              Export CSV
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex gap-3">
+            <button onClick={exportCSV} className="flex-1 rounded-xl py-3 px-4 shadow-sm border flex items-center justify-center gap-2 transition-colors text-sm font-medium" style={{ backgroundColor: "var(--bm-card-bg)", color: "var(--bm-charcoal)", borderColor: "var(--bm-border)" }}>
+              <FileSpreadsheet size={16} style={{ color: "#7A8B6E" }} /> Export CSV
             </button>
             <button
               onClick={() => {
@@ -512,96 +483,63 @@ export function CourbePage({ data }: CourbePageProps) {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
               }}
-              className="flex-1 bg-white hover:bg-[#FAF6F0] text-[#2D2A26] rounded-xl py-3 px-4 shadow-sm border border-[rgba(45,42,38,0.1)] flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+              className="flex-1 rounded-xl py-3 px-4 shadow-sm border flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+              style={{ backgroundColor: "var(--bm-card-bg)", color: "var(--bm-charcoal)", borderColor: "var(--bm-border)" }}
             >
-              <Download size={16} className="text-[#6B8FA3]" />
-              Export JSON
+              <Download size={16} style={{ color: "#6B8FA3" }} /> Export JSON
             </button>
           </motion.div>
         )}
 
-        {/* Paginated Weight History */}
+        {/* Paginated history */}
         {weightHistory.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl p-5 shadow-md"
-          >
-            <h3 className="text-sm font-medium text-[rgba(45,42,38,0.6)] uppercase tracking-wider mb-4">
-              Historique des pesées
-            </h3>
-
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-2xl p-5 shadow-md" style={{ backgroundColor: "var(--bm-card-bg)" }}>
+            <h3 className="text-sm font-medium uppercase tracking-wider mb-4" style={{ color: "var(--bm-text-secondary)" }}>Historique des pesées</h3>
             <div className="space-y-2">
               {paginatedEntries.map((entry) => {
                 const entryWeeks = getAgeInWeeks(profile.birthDate, entry.date);
-                const entryAgeMonths = Math.floor(entryWeeks / 4);
-                const entryAgeWeeksRemainder = entryWeeks % 4;
+                const months = Math.floor(entryWeeks / 4);
+                const remWeeks = entryWeeks % 4;
                 return (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between p-3 bg-[#FAF6F0] rounded-xl"
-                  >
+                  <div key={entry.id} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: "var(--bm-surface)" }}>
                     <div className="flex items-center gap-3">
-                      <Scale size={16} className="text-[#C8956C]" />
+                      <Scale size={16} style={{ color: "var(--bm-gold)" }} />
                       <div>
-                        <p className="font-semibold text-[#2D2A26]">{entry.weightKg} kg</p>
-                        <p className="text-xs text-[rgba(45,42,38,0.5)]">
-                          {format(new Date(entry.date), "d MMM yyyy", { locale: fr })}
-                          {" · "}
-                          {entryAgeMonths}m{entryAgeWeeksRemainder > 0 ? `${entryAgeWeeksRemainder}s` : ""}
+                        <p className="font-semibold" style={{ color: "var(--bm-charcoal)" }}>{entry.weightKg} kg</p>
+                        <p className="text-xs" style={{ color: "var(--bm-text-tertiary)" }}>
+                          {format(new Date(entry.date), "d MMM yyyy", { locale: fr })} · {months}m{remWeeks > 0 ? `${remWeeks}s` : ""}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {entry.bodyConditionScore && (
-                        <span className="px-2 py-0.5 bg-[#F0E2D0] rounded-full text-xs font-medium text-[#C8956C]">
-                          BCS {entry.bodyConditionScore}
-                        </span>
-                      )}
-                    </div>
+                    {entry.bodyConditionScore && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}>
+                        BCS {entry.bodyConditionScore}
+                      </span>
+                    )}
                   </div>
                 );
               })}
             </div>
-
-            {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-[rgba(45,42,38,0.08)]">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-[#C8956C] disabled:text-[rgba(45,42,38,0.3)] disabled:cursor-not-allowed hover:bg-[#FAF6F0] transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                  Précédent
+              <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "1px solid var(--bm-border)" }}>
+                <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: "var(--bm-gold)" }}>
+                  <ChevronLeft size={16} /> Précédent
                 </button>
-                <span className="text-sm text-[rgba(45,42,38,0.6)]">
-                  Page {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-[#C8956C] disabled:text-[rgba(45,42,38,0.3)] disabled:cursor-not-allowed hover:bg-[#FAF6F0] transition-colors"
-                >
-                  Suivant
-                  <ChevronRight size={16} />
+                <span className="text-sm" style={{ color: "var(--bm-text-secondary)" }}>Page {currentPage} / {totalPages}</span>
+                <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: "var(--bm-gold)" }}>
+                  Suivant <ChevronRight size={16} />
                 </button>
               </div>
             )}
           </motion.div>
         )}
 
-        {/* CTA */}
-        <motion.button
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
+        <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
           onClick={() => navigate("/saisie")}
-          className="w-full bg-[#C8956C] hover:bg-[#A67B5B] text-white rounded-2xl py-4 px-5 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold"
+          className="w-full rounded-2xl py-4 px-5 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold text-white"
+          style={{ backgroundColor: "var(--bm-gold)" }}
         >
-          <Scale size={20} />
-          Saisir un nouveau poids
+          <Scale size={20} /> Saisir un nouveau poids
         </motion.button>
       </main>
     </div>

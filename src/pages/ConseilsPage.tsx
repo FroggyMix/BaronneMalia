@@ -47,7 +47,7 @@ export function ConseilsPage({ data }: ConseilsPageProps) {
     : 0;
   const weightStatus = getWeightStatus(currentWeight, ageWeeks);
   const feedingRec = currentWeight > 0
-    ? getFeedingRecommendation(currentWeight, ageWeeks, profile.neutered, profile.activityLevel, weightHistory)
+    ? getFeedingRecommendation(currentWeight, ageWeeks, profile.neutered, profile.activityLevel, weightHistory, profile.birthDate)
     : null;
 
   const personalizedAdvice = useMemo(() => {

@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   reminderEnabled: false,
   reminderDay: "sunday",
   dataVersion: CURRENT_VERSION,
+  selectedReference: "ref03", // AKC/GRCA recommended by default
 };
 
 const DEFAULT_DATA: AppData = {
@@ -268,6 +269,13 @@ export function useSupabaseData() {
     }));
   }, []);
 
+  const updateReference = useCallback((referenceId: string) => {
+    setData((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, selectedReference: referenceId },
+    }));
+  }, []);
+
   const exportData = useCallback((): string => {
     const exportObj = {
       ...data,
@@ -323,6 +331,7 @@ export function useSupabaseData() {
     addFeedingEntry,
     updateProfile,
     updateSettings,
+    updateReference,
     exportData,
     importData,
     resetWithDemoData,

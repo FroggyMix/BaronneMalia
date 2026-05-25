@@ -19,18 +19,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useThemeContext } from "@/App";
+import { GROWTH_REFERENCES } from "@/data/growthReferences";
 
 interface HeaderProps {
   title?: string;
   showBack?: boolean;
   showSettings?: boolean;
+  selectedReference?: string;
   onExport?: () => string;
   onImport?: (json: string) => boolean;
   onResetDemo?: () => void;
   onClearAll?: () => void;
+  onUpdateReference?: (referenceId: string) => void;
 }
 
-export function Header({ title, showBack, showSettings, onExport, onImport, onResetDemo, onClearAll }: HeaderProps) {
+export function Header({ title, showBack, showSettings, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: HeaderProps) {
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -132,6 +135,54 @@ export function Header({ title, showBack, showSettings, onExport, onImport, onRe
                   <SheetTitle className="font-bold text-lg" style={{ color: "var(--bm-charcoal)" }}>Paramètres</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-4">
+                  {/* Growth Reference section */}
+                  {onUpdateReference && (
+                    <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
+                      <h3 className="font-semibold mb-3" style={{ color: "var(--bm-charcoal)" }}>Référentiel de croissance</h3>
+                      <div className="space-y-2">
+                        {GROWTH_REFERENCES.map((ref) => (
+                          <button
+                            key={ref.id}
+                            onClick={() => onUpdateReference(ref.id)}
+                            className="w-full flex items-start gap-3 p-3 rounded-lg transition-colors text-left"
+                            style={
+                              selectedReference === ref.id
+                                ? { backgroundColor: "var(--bm-pale-gold)", border: "1px solid var(--bm-gold)" }
+                                : { backgroundColor: "transparent" }
+                            }
+                            onMouseEnter={(e) => {
+                              if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "var(--bm-surface)";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (selectedReference !== ref.id) e.currentTarget.style.backgroundColor = "transparent";
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm" style={{ color: "var(--bm-charcoal)" }}>{ref.shortLabel}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{
+                                  backgroundColor: ref.quality === 'A' || ref.quality === 'A-' ? '#D4E0CD' : '#F0E2D0',
+                                  color: ref.quality === 'A' || ref.quality === 'A-' ? '#7A8B6E' : '#C8956C',
+                                }}>
+                                  {ref.quality}
+                                </span>
+                                {ref.recommended && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ backgroundColor: 'var(--bm-pale-gold)', color: 'var(--bm-gold)' }}>
+                                    Recommandé
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs mt-0.5" style={{ color: "var(--bm-text-tertiary)" }}>{ref.description}</p>
+                            </div>
+                            {selectedReference === ref.id && (
+                              <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: "var(--bm-gold)" }} />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Theme section */}
                   <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: "var(--bm-card-bg)" }}>
                     <h3 className="font-semibold mb-3" style={{ color: "var(--bm-charcoal)" }}>Thème</h3>

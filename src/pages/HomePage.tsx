@@ -28,10 +28,12 @@ import { Header } from "@/components/Header";
 
 interface HomePageProps {
   data: AppData;
+  selectedReference: string;
   onExport: () => string;
   onImport: (json: string) => boolean;
   onResetDemo: () => void;
   onClearAll: () => void;
+  updateReference?: (id: string) => void;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
@@ -49,7 +51,7 @@ const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> =
   "Pas assez de données": { icon: Minus, color: "rgba(45,42,38,0.4)" },
 };
 
-export function HomePage({ data, onExport, onImport, onResetDemo, onClearAll }: HomePageProps) {
+export function HomePage({ data, selectedReference, onExport, onImport, onResetDemo, onClearAll, updateReference }: HomePageProps) {
   const navigate = useNavigate();
   const [animatedWeight, setAnimatedWeight] = useState(0);
   const [advicePreview, setAdvicePreview] = useState<string>("");
@@ -58,7 +60,7 @@ export function HomePage({ data, onExport, onImport, onResetDemo, onClearAll }: 
   const ageWeeks = getAgeInWeeks(profile.birthDate);
   const ageDisplay = getAgeDisplay(profile.birthDate);
   const stats = getWeightStats(weightHistory);
-  const trend = projectWeightTrend(weightHistory, 6);
+  const trend = projectWeightTrend(weightHistory, profile.birthDate, 6);
 
   const currentWeight = stats.currentWeight || 0;
   const weightStatus = getWeightStatus(currentWeight, ageWeeks);
@@ -67,7 +69,8 @@ export function HomePage({ data, onExport, onImport, onResetDemo, onClearAll }: 
     ageWeeks,
     profile.neutered,
     profile.activityLevel,
-    weightHistory
+    weightHistory,
+    profile.birthDate,
   );
 
   useEffect(() => {
@@ -110,7 +113,7 @@ export function HomePage({ data, onExport, onImport, onResetDemo, onClearAll }: 
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
-      <Header showSettings onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} />
+      <Header showSettings selectedReference={selectedReference} onExport={onExport} onImport={onImport} onResetDemo={onResetDemo} onClearAll={onClearAll} onUpdateReference={(id) => updateReference?.(id)} />
 
       <main className="pt-20 px-5 max-w-lg mx-auto space-y-4">
         {/* Profile Card */}

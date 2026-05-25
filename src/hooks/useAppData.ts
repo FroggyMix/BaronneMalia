@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   reminderEnabled: false,
   reminderDay: "sunday",
   dataVersion: CURRENT_VERSION,
+  selectedReference: "ref03", // AKC/GRCA default
 };
 
 const DEFAULT_DATA: AppData = {

@@ -47,11 +47,14 @@ function App() {
     isConfigured,
     addWeightEntry,
     addFeedingEntry,
+    updateReference,
     exportData,
     importData,
     resetWithDemoData,
     clearAllData,
   } = useSupabaseData();
+
+  const selectedReference = data.settings.selectedReference;
 
   // Auto-load demo data on first visit if empty and Supabase not configured
   useEffect(() => {
@@ -124,10 +127,12 @@ function App() {
               element={
                 <HomePage
                   data={data}
+                  selectedReference={selectedReference}
                   onExport={exportData}
                   onImport={importData}
                   onResetDemo={resetWithDemoData}
                   onClearAll={clearAllData}
+                  updateReference={updateReference}
                 />
               }
             />
@@ -141,7 +146,7 @@ function App() {
                 />
               }
             />
-            <Route path="/courbe" element={<CourbePage data={data} />} />
+            <Route path="/courbe" element={<CourbePage data={data} selectedReference={selectedReference} />} />
             <Route path="/conseils" element={<ConseilsPage data={data} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -31,6 +31,7 @@ export interface AppSettings {
   reminderEnabled: boolean;
   reminderDay: string;
   dataVersion: number;
+  selectedReference: string; // ID of the growth reference curve
 }
 
 export interface AppData {

@@ -126,71 +126,71 @@ export function getGramsEstimate(dailyKcal: number): number {
 }
 
 /**
- * Project weight trend using linear regression on recent entries
+ * Project weight trend using linear regression (ordinary least squares)
+ * on recent entries. Returns projection points with absolute age in weeks.
  */
 export function projectWeightTrend(
   entries: WeightEntry[],
+  birthDate: string,
   weeksAhead: number = 6
-): { projectedWeights: Array<{ week: number; weight: number }>; trendDescription: string; trendRate: number } {
+): { projectedPoints: Array<{ x: number; y: number }>; trendDescription: string; trendRate: number } {
   if (entries.length < 2) {
-    return { projectedWeights: [], trendDescription: "Pas assez de données", trendRate: 0 };
+    return { projectedPoints: [], trendDescription: "Pas assez de données", trendRate: 0 };
   }
 
-  // Sort by date
+  // Sort by date, take last 6 entries for responsive trend
   const sorted = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  // Use last 8 entries max for recent trend
-  const recent = sorted.slice(-8);
-  
-  // Simple linear regression
+  const recent = sorted.slice(-6);
+
+  // Linear regression: y = slope * x + intercept
+  // x = age in weeks, y = weight in kg
   const n = recent.length;
   let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-  
-  const firstDate = new Date(recent[0].date).getTime();
-  const msPerWeek = 1000 * 60 * 60 * 24 * 7;
-  
+
   for (const entry of recent) {
-    const x = (new Date(entry.date).getTime() - firstDate) / msPerWeek;
+    const x = getAgeInWeeks(birthDate, entry.date);
     const y = entry.weightKg;
     sumX += x;
     sumY += y;
     sumXY += x * y;
     sumX2 += x * x;
   }
-  
+
   const denominator = n * sumX2 - sumX * sumX;
   if (denominator === 0) {
-    return { projectedWeights: [], trendDescription: "Tendance stable", trendRate: 0 };
+    return { projectedPoints: [], trendDescription: "Tendance stable", trendRate: 0 };
   }
-  
+
   const slope = (n * sumXY - sumX * sumY) / denominator; // kg per week
-  const intercept = (sumY - slope * sumX) / n;
-  
-  // Project forward
+
+  // Last measurement anchor point
   const lastEntry = recent[recent.length - 1];
-  const lastWeek = (new Date(lastEntry.date).getTime() - firstDate) / msPerWeek;
-  
-  const projectedWeights: Array<{ week: number; weight: number }> = [];
+  const lastAgeWeeks = getAgeInWeeks(birthDate, lastEntry.date);
+  const lastWeight = lastEntry.weightKg;
+
+  // Project forward: start exactly from last known point
+  const projectedPoints: Array<{ x: number; y: number }> = [];
   for (let w = 1; w <= weeksAhead; w++) {
-    const projectedWeight = slope * (lastWeek + w) + intercept;
-    projectedWeights.push({
-      week: w,
-      weight: Math.max(0, Math.round(projectedWeight * 10) / 10),
+    const ageWeeks = lastAgeWeeks + w;
+    const projectedWeight = lastWeight + slope * w;
+    projectedPoints.push({
+      x: ageWeeks,
+      y: Math.max(0.5, Math.round(projectedWeight * 10) / 10),
     });
   }
-  
+
   // Trend description
-  const monthlyRate = slope * 4.33; // kg per month
+  const monthlyRate = slope * 4.33;
   let trendDescription: string;
-  
+
   if (monthlyRate > 1.5) trendDescription = "Hausse rapide";
   else if (monthlyRate > 0.5) trendDescription = "Hausse modérée";
   else if (monthlyRate > -0.5) trendDescription = "Stable";
   else if (monthlyRate > -1.5) trendDescription = "Baisse modérée";
   else trendDescription = "Baisse rapide";
-  
+
   return {
-    projectedWeights,
+    projectedPoints,
     trendDescription,
     trendRate: Math.round(monthlyRate * 100) / 100,
   };
@@ -204,7 +204,8 @@ export function getFeedingRecommendation(
   ageWeeks: number,
   isNeutered: boolean,
   activityLevel: "sedentary" | "moderate" | "active" | "very_active",
-  entries: WeightEntry[]
+  entries: WeightEntry[],
+  birthDate: string,
 ): {
   dailyKcal: number;
   mealsPerDay: number;
@@ -243,7 +244,7 @@ export function getFeedingRecommendation(
   
   // Trend-based adjustments
   if (entries.length >= 3) {
-    const trend = projectWeightTrend(entries, 2);
+    const trend = projectWeightTrend(entries, birthDate, 2);
     if (trend.trendRate > 1.5 && !adjusted) {
       adjustedKcal *= 0.95;
       adjusted = true;
