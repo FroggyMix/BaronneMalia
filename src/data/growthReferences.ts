@@ -1,5 +1,6 @@
-// Auto-generated from CSV reference files
+// Auto-generated from CSV reference files with backward extrapolation
 // Sources: WALTHAM/PLOS ONE, AKC/GRCA, Pawlicy, Tuggs
+// Note: REF01/REF02/REF03 extrapolated from week 12 down to week 8
 
 export interface ReferencePoint {
   week: number;
@@ -19,6 +20,10 @@ export interface GrowthReference {
 }
 
 const REF01_DATA: ReferencePoint[] = [
+  { week: 8, minKg: 2.84, maxKg: 5.64 },
+  { week: 9, minKg: 3.39, maxKg: 6.53 },
+  { week: 10, minKg: 3.94, maxKg: 7.42 },
+  { week: 11, minKg: 4.49, maxKg: 8.3 },
   { week: 12, minKg: 5.04, maxKg: 9.19 },
   { week: 13, minKg: 5.54, maxKg: 9.99 },
   { week: 14, minKg: 6.11, maxKg: 10.92 },
@@ -115,6 +120,10 @@ const REF01_DATA: ReferencePoint[] = [
 ];
 
 const REF02_DATA: ReferencePoint[] = [
+  { week: 8, minKg: 3.08, maxKg: 6.75 },
+  { week: 9, minKg: 3.83, maxKg: 7.89 },
+  { week: 10, minKg: 4.58, maxKg: 9.03 },
+  { week: 11, minKg: 5.33, maxKg: 10.17 },
   { week: 12, minKg: 6.08, maxKg: 11.31 },
   { week: 13, minKg: 6.77, maxKg: 12.36 },
   { week: 14, minKg: 7.55, maxKg: 13.56 },
@@ -211,6 +220,10 @@ const REF02_DATA: ReferencePoint[] = [
 ];
 
 const REF03_DATA: ReferencePoint[] = [
+  { week: 8, minKg: 4.42, maxKg: 5.22 },
+  { week: 9, minKg: 5.19, maxKg: 6.13 },
+  { week: 10, minKg: 5.96, maxKg: 7.04 },
+  { week: 11, minKg: 6.72, maxKg: 7.94 },
   { week: 12, minKg: 7.49, maxKg: 8.85 },
   { week: 13, minKg: 8.18, maxKg: 9.67 },
   { week: 14, minKg: 8.99, maxKg: 10.62 },
@@ -521,8 +534,8 @@ const FUSION_DATA: ReferencePoint[] = [
   { week: 7, minKg: 1.74, maxKg: 6.27 },
   { week: 8, minKg: 2.06, maxKg: 7.31 },
   { week: 9, minKg: 2.62, maxKg: 8.23 },
-  { week: 10, minKg: 3.66, maxKg: 8.92 },
-  { week: 11, minKg: 4.71, maxKg: 9.62 },
+  { week: 10, minKg: 3.66, maxKg: 9.03 },
+  { week: 11, minKg: 4.49, maxKg: 10.17 },
   { week: 12, minKg: 5.04, maxKg: 11.31 },
   { week: 13, minKg: 5.54, maxKg: 12.36 },
   { week: 14, minKg: 6.11, maxKg: 13.56 },
@@ -623,10 +636,10 @@ const AVERAGE_DATA: ReferencePoint[] = [
   { week: 5, minKg: 1.79, maxKg: 3.41 },
   { week: 6, minKg: 2.29, maxKg: 4.19 },
   { week: 7, minKg: 2.79, maxKg: 4.96 },
-  { week: 8, minKg: 3.3, maxKg: 5.75 },
-  { week: 9, minKg: 3.96, maxKg: 6.55 },
-  { week: 10, minKg: 4.95, maxKg: 7.42 },
-  { week: 11, minKg: 5.93, maxKg: 8.3 },
+  { week: 8, minKg: 3.39, maxKg: 5.82 },
+  { week: 9, minKg: 4.07, maxKg: 6.73 },
+  { week: 10, minKg: 4.87, maxKg: 7.67 },
+  { week: 11, minKg: 5.68, maxKg: 8.6 },
   { week: 12, minKg: 6.49, maxKg: 9.54 },
   { week: 13, minKg: 7.26, maxKg: 10.42 },
   { week: 14, minKg: 7.89, maxKg: 11.28 },
@@ -728,7 +741,7 @@ export const GROWTH_REFERENCES: GrowthReference[] = [
     label: "WALTHAM 15-30 kg (centiles 9-91)",
     shortLabel: "WALTHAM 15-30",
     quality: "A",
-    description: "WALTHAM/Royal Canin - femelle gabarit 15-30 kg adulte. Digitisation de la figure scientifique PLOS ONE.",
+    description: "WALTHAM/Royal Canin - femelle gabarit 15-30 kg adulte. Digitisation de la figure scientifique PLOS ONE. Données extrapolées en arrière pour les semaines 8-11.",
     sourceUrl: "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0182064",
     recommended: true,
     data: REF01_DATA,
@@ -738,7 +751,7 @@ export const GROWTH_REFERENCES: GrowthReference[] = [
     label: "WALTHAM 30-40 kg (centiles 9-91)",
     shortLabel: "WALTHAM 30-40",
     quality: "A",
-    description: "WALTHAM/Royal Canin - femelle gabarit 30-40 kg adulte. Pour lignées très grandes ou lourdes.",
+    description: "WALTHAM/Royal Canin - femelle gabarit 30-40 kg adulte. Pour lignées très grandes ou lourdes. Données extrapolées en arrière pour les semaines 8-11.",
     sourceUrl: "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0182064",
     recommended: false,
     data: REF02_DATA,
@@ -748,7 +761,7 @@ export const GROWTH_REFERENCES: GrowthReference[] = [
     label: "AKC/GRCA 55-65 lb × forme WALTHAM",
     shortLabel: "AKC/GRCA + WALTHAM",
     quality: "A-",
-    description: "Standard officiel Golden Retriever femelle (55-65 lb) projeté avec la dynamique de croissance WALTHAM. Recommandé par défaut.",
+    description: "Standard officiel Golden Retriever femelle (55-65 lb) projeté avec la dynamique de croissance WALTHAM. Recommandé par défaut. Données extrapolées en arrière pour les semaines 8-11.",
     sourceUrl: "https://images.akc.org/pdf/breeds/standards/GoldenRetriever.pdf",
     recommended: true,
     data: REF03_DATA,
@@ -803,19 +816,25 @@ export function getReferenceData(referenceId: string): ReferencePoint[] {
 export function getIdealWeightRangeRef(weeks: number, referenceId: string): { min: number; max: number } {
   const data = getReferenceData(referenceId);
 
+  // Find exact match
+  const exact = data.find((d) => d.week === weeks);
+  if (exact) return { min: exact.minKg, max: exact.maxKg };
+
+  // Before first data point: return first
   if (weeks <= data[0].week) {
     return { min: data[0].minKg, max: data[0].maxKg };
   }
+  // After last data point: return last
   if (weeks >= data[data.length - 1].week) {
     const last = data[data.length - 1];
     return { min: last.minKg, max: last.maxKg };
   }
 
-  // Find surrounding points and linearly interpolate
+  // Linear interpolation between surrounding points
   for (let i = 0; i < data.length - 1; i++) {
-    if (weeks >= data[i].week && weeks <= data[i + 1].week) {
+    if (weeks > data[i].week && weeks < data[i + 1].week) {
       const range = data[i + 1].week - data[i].week;
-      const progress = range === 0 ? 0 : (weeks - data[i].week) / range;
+      const progress = (weeks - data[i].week) / range;
       return {
         min: Math.round((data[i].minKg + (data[i + 1].minKg - data[i].minKg) * progress) * 100) / 100,
         max: Math.round((data[i].maxKg + (data[i + 1].maxKg - data[i].maxKg) * progress) * 100) / 100,
