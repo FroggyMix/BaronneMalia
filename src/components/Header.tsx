@@ -139,7 +139,7 @@ export function Header({
             className="text-xl font-bold tracking-tight"
             style={{ fontFamily: "'Playfair Display', serif", color: "var(--bm-charcoal)" }}
           >
-            {title || "Baronne Malia"}
+            {title || "Baronne Malia La Belle"}
           </h1>
         </div>
         <div className="flex items-center gap-1">
