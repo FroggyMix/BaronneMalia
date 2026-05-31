@@ -117,10 +117,23 @@ export function useSupabaseData() {
 
           const local = loadLocalData();
           const mergedProfile = profile || local.profile;
-          const mergedWeights =
-            weightEntries.length > 0 ? weightEntries : local.weightHistory;
-          const mergedFeedings =
-            feedingEntries.length > 0 ? feedingEntries : local.feedingHistory;
+
+          // Merge: union of remote + local entries by id (local wins on conflict)
+          const remoteWeightIds = new Set(weightEntries.map((e) => e.id));
+          const localWeightsNotOnRemote = local.weightHistory.filter(
+            (e) => !remoteWeightIds.has(e.id)
+          );
+          const mergedWeights = [...weightEntries, ...localWeightsNotOnRemote].sort(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+          );
+
+          const remoteFeedingIds = new Set(feedingEntries.map((e) => e.id));
+          const localFeedingsNotOnRemote = local.feedingHistory.filter(
+            (e) => !remoteFeedingIds.has(e.id)
+          );
+          const mergedFeedings = [...feedingEntries, ...localFeedingsNotOnRemote].sort(
+            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+          );
 
           const newData: AppData = {
             profile: mergedProfile,
