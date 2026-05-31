@@ -23,8 +23,6 @@ import {
   Scale,
   Calendar,
   Target,
-  ChevronLeft,
-  ChevronRight,
   FileSpreadsheet,
   Download,
 } from "lucide-react";
@@ -74,7 +72,7 @@ const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> =
   "Pas assez de données": { icon: Minus, color: "rgba(45,42,38,0.4)" },
 };
 
-const ITEMS_PER_PAGE = 10;
+// Items per page removed - history now in Journal page
 
 function formatAgeLabel(weeks: number): string {
   const months = Math.floor(weeks / 4);
@@ -87,7 +85,7 @@ function formatAgeLabel(weeks: number): string {
 export function CourbePage({ data, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: CourbePageProps) {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [, setCurrentPage] = useState(1);
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains("dark"));
   const [showRefSelector, setShowRefSelector] = useState(false);
 
@@ -353,12 +351,7 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
     animation: { duration: 400, easing: "easeOutQuart" },
   };
 
-  // Pagination
-  const sortedEntries = useMemo(() => {
-    return [...weightHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [weightHistory]);
-  const totalPages = Math.max(1, Math.ceil(sortedEntries.length / ITEMS_PER_PAGE));
-  const paginatedEntries = sortedEntries.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // Pagination removed - history moved to Journal page
 
   // CSV export
   const exportCSV = () => {
@@ -557,49 +550,7 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           </motion.div>
         )}
 
-        {/* Paginated history */}
-        {weightHistory.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-2xl p-5 shadow-md" style={{ backgroundColor: "var(--bm-card-bg)" }}>
-            <h3 className="text-sm font-medium uppercase tracking-wider mb-4" style={{ color: "var(--bm-text-secondary)" }}>Historique des pesées</h3>
-            <div className="space-y-2">
-              {paginatedEntries.map((entry) => {
-                const entryWeeks = getAgeInWeeksDecimal(profile.birthDate, entry.date);
-                const months = Math.floor(entryWeeks / 4);
-                const remWeeks = Math.round(entryWeeks % 4);
-                return (
-                  <div key={entry.id} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: "var(--bm-surface)" }}>
-                    <div className="flex items-center gap-3">
-                      <Scale size={16} style={{ color: "var(--bm-gold)" }} />
-                      <div>
-                        <p className="font-semibold" style={{ color: "var(--bm-charcoal)" }}>{entry.weightKg} kg</p>
-                        <p className="text-xs" style={{ color: "var(--bm-text-tertiary)" }}>
-                          {format(new Date(entry.date), "d MMM yyyy", { locale: fr })} · {months}m{remWeeks > 0 ? `${remWeeks}s` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    {entry.bodyConditionScore && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}>
-                        BCS {entry.bodyConditionScore}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "1px solid var(--bm-border)" }}>
-                <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: "var(--bm-gold)" }}>
-                  <ChevronLeft size={16} /> Précédent
-                </button>
-                <span className="text-sm" style={{ color: "var(--bm-text-secondary)" }}>Page {currentPage} / {totalPages}</span>
-                <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: "var(--bm-gold)" }}>
-                  Suivant <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-
+        {/* Navigation to Journal */}
         <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
           onClick={() => navigate("/saisie")}
           className="w-full rounded-2xl py-4 px-5 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold text-white"

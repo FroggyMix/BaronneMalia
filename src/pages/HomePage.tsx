@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   PawPrint,
   TrendingUp,
@@ -11,17 +11,11 @@ import {
   Calendar,
   Scale,
   AlertTriangle,
-  Pencil,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  X,
-  Check,
-  History,
+  Info,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { AppData, WeightEntry, FeedingEntry } from "@/types";
+import type { AppData, FeedingEntry } from "@/types";
 import {
   getAgeInWeeks,
   getAgeDisplay,
@@ -29,6 +23,7 @@ import {
   projectWeightTrend,
   getFeedingRecommendation,
   getWeightStatus,
+  getFeedingAnalysis,
 } from "@/utils/calculations";
 import { getAdviceForAge } from "@/data/nutritionAdvice";
 import { Header } from "@/components/Header";
@@ -41,10 +36,6 @@ interface HomePageProps {
   onResetDemo: () => void;
   onClearAll: () => void;
   updateReference?: (id: string) => void;
-  onUpdateWeight?: (id: string, updates: Partial<WeightEntry>) => void;
-  onDeleteWeight?: (id: string) => void;
-  onUpdateFeeding?: (id: string, updates: Partial<FeedingEntry>) => void;
-  onDeleteFeeding?: (id: string) => void;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
@@ -62,14 +53,6 @@ const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> =
   "Pas assez de données": { icon: Minus, color: "rgba(45,42,38,0.4)" },
 };
 
-const FOOD_LABELS: Record<string, string> = {
-  croquettes: "Croquettes",
-  "patée": "Pâtée",
-  mix: "Mix",
-  BARF: "BARF",
-  maison: "Maison",
-};
-
 export function HomePage({
   data,
   selectedReference,
@@ -78,23 +61,10 @@ export function HomePage({
   onResetDemo,
   onClearAll,
   updateReference,
-  onUpdateWeight,
-  onDeleteWeight,
-  onUpdateFeeding,
-  onDeleteFeeding,
 }: HomePageProps) {
   const navigate = useNavigate();
   const [animatedWeight, setAnimatedWeight] = useState(0);
   const [advicePreview, setAdvicePreview] = useState<string>("");
-  const [editingWeightId, setEditingWeightId] = useState<string | null>(null);
-  const [editingFeedingId, setEditingFeedingId] = useState<string | null>(null);
-  const [editWeight, setEditWeight] = useState("");
-  const [editBcs, setEditBcs] = useState(5);
-  const [editNotes, setEditNotes] = useState("");
-  const [showWeightHistory, setShowWeightHistory] = useState(false);
-  const [showFeedingHistory, setShowFeedingHistory] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [deleteType, setDeleteType] = useState<"weight" | "feeding">("weight");
 
   const { profile, weightHistory, feedingHistory } = data;
   const ageWeeks = getAgeInWeeks(profile.birthDate);
@@ -112,6 +82,11 @@ export function HomePage({
     weightHistory,
     profile.birthDate,
   );
+
+  // NEW: Feeding analysis — real vs theoretical with weight-state adjustment
+  const feedingAnalysis = feedingHistory.length > 0
+    ? getFeedingAnalysis(feedingHistory, feeding.dailyKcal, weightStatus, trend.trendDescription)
+    : null;
 
   useEffect(() => {
     if (currentWeight > 0) {
@@ -145,48 +120,11 @@ export function HomePage({
     ? format(new Date(stats.currentDate), "d MMMM yyyy", { locale: fr })
     : "Aucune pesée";
 
-  // Sort entries reverse chronological for history display
-  const sortedWeights = [...weightHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const sortedFeedings = [...feedingHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Most recent feeding entry
+  const lastFeeding: FeedingEntry | null = feedingHistory.length > 0
+    ? [...feedingHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+    : null;
 
-  const startEditWeight = (entry: WeightEntry) => {
-    setEditingWeightId(entry.id);
-    setEditWeight(entry.weightKg.toString());
-    setEditBcs(entry.bodyConditionScore || 5);
-    setEditNotes(entry.notes || "");
-  };
-
-  const saveEditWeight = (id: string) => {
-    const w = parseFloat(editWeight);
-    if (w && w > 0 && w < 80 && onUpdateWeight) {
-      onUpdateWeight(id, {
-        weightKg: w,
-        bodyConditionScore: editBcs,
-        notes: editNotes || undefined,
-      });
-    }
-    setEditingWeightId(null);
-  };
-
-  const cancelEditWeight = () => {
-    setEditingWeightId(null);
-    setEditWeight("");
-    setEditBcs(5);
-    setEditNotes("");
-  };
-
-  const handleDelete = () => {
-    if (deleteConfirmId) {
-      if (deleteType === "weight" && onDeleteWeight) {
-        onDeleteWeight(deleteConfirmId);
-      } else if (deleteType === "feeding" && onDeleteFeeding) {
-        onDeleteFeeding(deleteConfirmId);
-      }
-      setDeleteConfirmId(null);
-    }
-  };
-
-  // Common card style
   const cardStyle = { backgroundColor: "var(--bm-card-bg)" };
   const textPrimary = { color: "var(--bm-charcoal)" };
   const textSecondary = { color: "var(--bm-text-secondary)" };
@@ -206,20 +144,13 @@ export function HomePage({
           style={cardStyle}
         >
           <div className="flex items-center gap-4">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: "var(--bm-pale-gold)" }}
-            >
+            <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--bm-pale-gold)" }}>
               <PawPrint size={28} style={{ color: "var(--bm-gold)" }} />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold" style={textPrimary}>{profile.name}</h2>
-              <p style={textSecondary}>
-                {profile.breed} {"\u2640"}
-              </p>
-              <p className="text-xs mt-0.5" style={textTertiary}>
-                {ageDisplay}
-              </p>
+              <p style={textSecondary}>{profile.breed} {"\u2640"}</p>
+              <p className="text-xs mt-0.5" style={textTertiary}>{ageDisplay}</p>
             </div>
           </div>
         </motion.div>
@@ -235,9 +166,7 @@ export function HomePage({
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider" style={textSecondary}>
-                Poids actuel
-              </p>
+              <p className="text-xs font-medium uppercase tracking-wider" style={textSecondary}>Poids actuel</p>
               <p className="text-4xl font-bold mt-1" style={{ color: "var(--bm-gold)" }}>
                 {currentWeight > 0 ? `${animatedWeight.toFixed(1)}` : "--"}
                 <span className="text-lg font-semibold ml-1">kg</span>
@@ -248,10 +177,7 @@ export function HomePage({
               </div>
             </div>
             {currentWeight > 0 && (
-              <span
-                className="px-3 py-1 rounded-full text-xs font-semibold"
-                style={{ backgroundColor: status.bg, color: status.color }}
-              >
+              <span className="px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: status.bg, color: status.color }}>
                 {status.label}
               </span>
             )}
@@ -273,13 +199,10 @@ export function HomePage({
             <div className="flex items-center gap-3">
               <TrendIcon size={24} style={{ color: trendColor }} />
               <div>
-                <p className="font-semibold" style={{ color: trendColor }}>
-                  {trend.trendDescription}
-                </p>
+                <p className="font-semibold" style={{ color: trendColor }}>{trend.trendDescription}</p>
                 {trend.trendRate !== 0 && (
                   <p className="text-sm" style={textSecondary}>
-                    {trend.trendRate > 0 ? "+" : ""}
-                    {trend.trendRate} kg/mois
+                    {trend.trendRate > 0 ? "+" : ""}{trend.trendRate} kg/mois
                   </p>
                 )}
               </div>
@@ -299,305 +222,130 @@ export function HomePage({
             <div className="flex items-center gap-2 mb-3">
               <Utensils size={18} style={{ color: "var(--bm-gold)" }} />
               <p className="text-xs font-medium uppercase tracking-wider" style={textSecondary}>
-                Recommandation du jour
+                Alimentation
               </p>
             </div>
-            <div className="space-y-1">
-              <p className="text-2xl font-bold" style={textPrimary}>
-                {feeding.dailyKcal}{" "}
-                <span className="text-base font-medium" style={textSecondary}>kcal/jour</span>
-              </p>
+
+            {/* Theoretical recommendation */}
+            <div className="space-y-1 mb-3">
               <p className="text-sm" style={textSecondary}>
-                {feeding.mealsPerDay} repas de ~{feeding.kcalPerMeal} kcal
+                Besoins théoriques pour un chiot de {currentWeight.toFixed(1)} kg à {Math.round(ageWeeks / 4.33)} mois :
+              </p>
+              <p className="text-2xl font-bold" style={textPrimary}>
+                {feeding.dailyKcal} <span className="text-base font-medium" style={textSecondary}>kcal/jour</span>
               </p>
               <p className="text-sm" style={textTertiary}>
-                ≈ {feeding.cupsEstimate} tasses | {feeding.gramsEstimate}g de croquettes standard
+                ≈ {feeding.mealsPerDay} repas de ~{feeding.kcalPerMeal} kcal | {feeding.gramsEstimate}g de croquettes standard
               </p>
             </div>
+
+            {/* NEW: Real vs theoretical comparison */}
+            {feedingAnalysis && (
+              <div
+                className="rounded-lg p-3 mb-3"
+                style={{
+                  backgroundColor: feedingAnalysis.adjustmentPercent !== 0 ? "var(--bm-pale-gold)" : "#D4E0CD",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {feedingAnalysis.adjustmentPercent !== 0 ? (
+                    <AlertTriangle size={14} style={{ color: "var(--bm-gold)" }} />
+                  ) : (
+                    <Info size={14} style={{ color: "#7A8B6E" }} />
+                  )}
+                  <p
+                    className="text-xs font-semibold"
+                    style={{ color: feedingAnalysis.adjustmentPercent !== 0 ? "var(--bm-gold)" : "#7A8B6E" }}
+                  >
+                    {feedingAnalysis.status}
+                  </p>
+                </div>
+                <p className="text-xs leading-relaxed" style={textSecondary}>
+                  {feedingAnalysis.reasoning}
+                </p>
+                {feedingAnalysis.adjustedKcal && feedingAnalysis.adjustedKcal !== feeding.dailyKcal && (
+                  <p className="text-xs font-semibold mt-1" style={{ color: "var(--bm-gold)" }}>
+                    Ration ajustée recommandée : {feedingAnalysis.adjustedKcal} kcal/jour
+                    {" "}({feedingAnalysis.adjustmentPercent && feedingAnalysis.adjustmentPercent > 0 ? "+" : ""}
+                    {feedingAnalysis.adjustmentPercent}%)
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Last recorded meal */}
+            {lastFeeding && (
+              <div className="flex items-center gap-2 py-2 border-t" style={{ borderColor: "var(--bm-border)" }}>
+                <p className="text-xs" style={textTertiary}>
+                  Dernier enregistrement : {lastFeeding.mealsPerDay} x {lastFeeding.quantityPerMealGrams}g
+                  ({lastFeeding.foodType})
+                  {" "}— {format(new Date(lastFeeding.date), "d MMM", { locale: fr })}
+                </p>
+              </div>
+            )}
+
             {feeding.warning && (
-              <div className="mt-3 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: "#E8D0CA" }}>
+              <div className="mt-2 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: "#E8D0CA" }}>
                 <AlertTriangle size={16} className="text-[#C06B5A] mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-[#C06B5A]">{feeding.warning}</p>
               </div>
             )}
-            <button
-              onClick={() => navigate("/conseils")}
-              className="mt-3 flex items-center gap-1 text-sm font-medium transition-colors"
-              style={{ color: "var(--bm-gold)" }}
-            >
-              Voir les conseils détaillés
-              <ChevronRight size={16} />
-            </button>
           </motion.div>
         )}
 
-        {/* Quick Entry Button */}
+        {/* Quick Entry Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.4 }}
+          className="flex gap-3"
         >
           <button
-            onClick={() => navigate("/saisie")}
-            className="w-full rounded-2xl py-4 px-5 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold text-white"
+            onClick={() => navigate("/saisie?tab=poids")}
+            className="flex-1 rounded-2xl py-4 px-3 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold text-white text-sm"
             style={{ backgroundColor: "var(--bm-gold)" }}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-gold-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-gold)")}
           >
-            <Scale size={20} />
-            Saisir un nouveau poids ou repas
+            <Scale size={18} />
+            Saisir un poids
+          </button>
+          <button
+            onClick={() => navigate("/saisie?tab=nourriture")}
+            className="flex-1 rounded-2xl py-4 px-3 shadow-md flex items-center justify-center gap-2 transition-colors font-semibold text-sm border-2"
+            style={{ borderColor: "var(--bm-gold)", color: "var(--bm-gold)", backgroundColor: "transparent" }}
+          >
+            <Utensils size={18} />
+            Saisir un repas
           </button>
         </motion.div>
-
-        {/* ===== WEIGHT HISTORY ===== */}
-        {weightHistory.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.5 }}
-            className="rounded-2xl shadow-md overflow-hidden"
-            style={cardStyle}
-          >
-            <button
-              onClick={() => setShowWeightHistory(!showWeightHistory)}
-              className="w-full flex items-center justify-between p-5"
-            >
-              <div className="flex items-center gap-2">
-                <History size={18} style={{ color: "var(--bm-gold)" }} />
-                <span className="font-semibold" style={textPrimary}>
-                  Historique des pesées ({weightHistory.length})
-                </span>
-              </div>
-              {showWeightHistory ? (
-                <ChevronUp size={18} style={textSecondary} />
-              ) : (
-                <ChevronDown size={18} style={textSecondary} />
-              )}
-            </button>
-
-            <AnimatePresence>
-              {showWeightHistory && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-5 pb-4 space-y-2">
-                    {sortedWeights.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="rounded-xl p-3 transition-colors"
-                        style={{ backgroundColor: "var(--bm-cream)" }}
-                      >
-                        {editingWeightId === entry.id ? (
-                          /* EDIT MODE */
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs" style={textSecondary}>Poids (kg)</label>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={editWeight}
-                                onChange={(e) => setEditWeight(e.target.value)}
-                                className="flex-1 h-10 px-3 rounded-lg text-sm border"
-                                style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs" style={textSecondary}>BCS (1-9)</label>
-                              <input
-                                type="number"
-                                min="1"
-                                max="9"
-                                value={editBcs}
-                                onChange={(e) => setEditBcs(parseInt(e.target.value) || 5)}
-                                className="w-20 h-10 px-3 rounded-lg text-sm border"
-                                style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs" style={textSecondary}>Notes</label>
-                              <input
-                                type="text"
-                                value={editNotes}
-                                onChange={(e) => setEditNotes(e.target.value)}
-                                className="flex-1 h-10 px-3 rounded-lg text-sm border"
-                                style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2 justify-end">
-                              <button
-                                onClick={cancelEditWeight}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: "var(--bm-text-secondary)" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                              >
-                                <X size={16} />
-                              </button>
-                              <button
-                                onClick={() => saveEditWeight(entry.id)}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: "#7A8B6E" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                              >
-                                <Check size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          /* DISPLAY MODE */
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold" style={textPrimary}>
-                                  {entry.weightKg.toFixed(1)} kg
-                                </span>
-                                {entry.bodyConditionScore && (
-                                  <span
-                                    className="px-1.5 py-0 rounded text-[10px] font-medium"
-                                    style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}
-                                  >
-                                    BCS {entry.bodyConditionScore}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs mt-0.5" style={textTertiary}>
-                                {format(new Date(entry.date), "d MMMM yyyy", { locale: fr })}
-                                {entry.notes && ` — ${entry.notes}`}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 ml-2">
-                              <button
-                                onClick={() => startEditWeight(entry)}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: "var(--bm-text-secondary)" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                title="Modifier"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                onClick={() => { setDeleteConfirmId(entry.id); setDeleteType("weight"); }}
-                                className="p-2 rounded-lg transition-colors"
-                                style={{ color: "#C06B5A" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                title="Supprimer"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-
-        {/* ===== FEEDING HISTORY ===== */}
-        {feedingHistory.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.6 }}
-            className="rounded-2xl shadow-md overflow-hidden"
-            style={cardStyle}
-          >
-            <button
-              onClick={() => setShowFeedingHistory(!showFeedingHistory)}
-              className="w-full flex items-center justify-between p-5"
-            >
-              <div className="flex items-center gap-2">
-                <Utensils size={18} style={{ color: "var(--bm-gold)" }} />
-                <span className="font-semibold" style={textPrimary}>
-                  Historique alimentaire ({feedingHistory.length})
-                </span>
-              </div>
-              {showFeedingHistory ? (
-                <ChevronUp size={18} style={textSecondary} />
-              ) : (
-                <ChevronDown size={18} style={textSecondary} />
-              )}
-            </button>
-
-            <AnimatePresence>
-              {showFeedingHistory && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-5 pb-4 space-y-2">
-                    {sortedFeedings.map((entry) => (
-                      <FeedingHistoryItem
-                        key={entry.id}
-                        entry={entry}
-                        isEditing={editingFeedingId === entry.id}
-                        onStartEdit={() => setEditingFeedingId(entry.id)}
-                        onSaveEdit={(id, updates) => {
-                          onUpdateFeeding?.(id, updates);
-                          setEditingFeedingId(null);
-                        }}
-                        onCancelEdit={() => setEditingFeedingId(null)}
-                        onDelete={(id) => {
-                          setDeleteConfirmId(id);
-                          setDeleteType("feeding");
-                        }}
-                      />
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
 
         {/* Advice Preview */}
         {advicePreview && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.7 }}
+            transition={{ duration: 0.4, delay: 0.5 }}
             className="rounded-2xl p-5 shadow-md"
             style={cardStyle}
           >
-            <p className="text-xs font-medium uppercase tracking-wider mb-2" style={textSecondary}>
-              Conseil du jour
-            </p>
+            <p className="text-xs font-medium uppercase tracking-wider mb-2" style={textSecondary}>Conseil du jour</p>
             <p className="text-sm leading-relaxed" style={textPrimary}>{advicePreview}</p>
             <button
               onClick={() => navigate("/conseils")}
               className="mt-2 flex items-center gap-1 text-sm font-medium transition-colors"
               style={{ color: "var(--bm-gold)" }}
             >
-              Lire la suite
-              <ChevronRight size={16} />
+              Lire la suite <ChevronRight size={16} />
             </button>
           </motion.div>
         )}
 
         {/* Empty state */}
         {weightHistory.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
             <Scale size={48} className="mx-auto mb-4" style={{ color: "var(--bm-text-tertiary)", opacity: 0.5 }} />
-            <p className="mb-4" style={textTertiary}>
-              Commencez par saisir le premier poids de {profile.name}
-            </p>
+            <p className="mb-4" style={textTertiary}>Commencez par saisir le premier poids de {profile.name}</p>
             <button
               onClick={() => navigate("/saisie")}
               className="rounded-xl py-3 px-6 font-semibold text-white transition-colors"
@@ -608,209 +356,6 @@ export function HomePage({
           </motion.div>
         )}
       </main>
-
-      {/* Delete Confirmation Dialog */}
-      <AnimatePresence>
-        {deleteConfirmId && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center px-5"
-            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-            onClick={() => setDeleteConfirmId(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="rounded-2xl p-6 w-full max-w-sm shadow-xl"
-              style={{ backgroundColor: "var(--bm-cream)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Trash2 size={20} style={{ color: "#C06B5A" }} />
-                <h3 className="font-bold" style={textPrimary}>Confirmer la suppression</h3>
-              </div>
-              <p className="text-sm mb-5" style={textSecondary}>
-                Cette action est irréversible. Voulez-vous vraiment supprimer cette entrée ?
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setDeleteConfirmId(null)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border"
-                  style={{ borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white"
-                  style={{ backgroundColor: "#C06B5A" }}
-                >
-                  Supprimer
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/* ===== FEEDING HISTORY ITEM COMPONENT ===== */
-function FeedingHistoryItem({
-  entry,
-  isEditing,
-  onStartEdit,
-  onSaveEdit,
-  onCancelEdit,
-  onDelete,
-}: {
-  entry: FeedingEntry;
-  isEditing: boolean;
-  onStartEdit: () => void;
-  onSaveEdit: (id: string, updates: Partial<FeedingEntry>) => void;
-  onCancelEdit: () => void;
-  onDelete: (id: string) => void;
-}) {
-  const [editMeals, setEditMeals] = useState(entry.mealsPerDay);
-  const [editQty, setEditQty] = useState(entry.quantityPerMealGrams);
-  const [editType, setEditType] = useState(entry.foodType);
-  const [editBrand, setEditBrand] = useState(entry.brand || "");
-
-  const textPrimary = { color: "var(--bm-charcoal)" };
-  const textTertiary = { color: "var(--bm-text-tertiary)" };
-
-  if (isEditing) {
-    return (
-      <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: "var(--bm-cream)" }}>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-[10px]" style={textTertiary}>Repas/jour</label>
-            <input
-              type="number" min={1} max={6}
-              value={editMeals}
-              onChange={(e) => setEditMeals(parseInt(e.target.value) || 1)}
-              className="w-full h-9 px-2 rounded-lg text-sm border"
-              style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-            />
-          </div>
-          <div>
-            <label className="text-[10px]" style={textTertiary}>Quantité (g)</label>
-            <input
-              type="number" min={10} max={1000} step={10}
-              value={editQty}
-              onChange={(e) => setEditQty(parseInt(e.target.value) || 10)}
-              className="w-full h-9 px-2 rounded-lg text-sm border"
-              style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-[10px]" style={textTertiary}>Type</label>
-            <select
-              value={editType}
-              onChange={(e) => setEditType(e.target.value)}
-              className="w-full h-9 px-2 rounded-lg text-sm border"
-              style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-            >
-              <option value="croquettes">Croquettes</option>
-              <option value="patée">Pâtée</option>
-              <option value="mix">Mix</option>
-              <option value="BARF">BARF</option>
-              <option value="maison">Maison</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px]" style={textTertiary}>Marque</label>
-            <input
-              type="text"
-              value={editBrand}
-              onChange={(e) => setEditBrand(e.target.value)}
-              className="w-full h-9 px-2 rounded-lg text-sm border"
-              style={{ backgroundColor: "var(--bm-card-bg)", borderColor: "var(--bm-border)", color: "var(--bm-charcoal)" }}
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-2 justify-end">
-          <button
-            onClick={onCancelEdit}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: "var(--bm-text-secondary)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-          >
-            <X size={16} />
-          </button>
-          <button
-            onClick={() => onSaveEdit(entry.id, {
-              mealsPerDay: editMeals,
-              quantityPerMealGrams: editQty,
-              foodType: editType,
-              brand: editBrand || undefined,
-            })}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: "#7A8B6E" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-          >
-            <Check size={16} />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="rounded-xl p-3 transition-colors"
-      style={{ backgroundColor: "var(--bm-cream)" }}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-sm" style={textPrimary}>
-              {entry.mealsPerDay} x {entry.quantityPerMealGrams}g
-            </span>
-            <span
-              className="px-1.5 py-0 rounded text-[10px] font-medium"
-              style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}
-            >
-              {FOOD_LABELS[entry.foodType] || entry.foodType}
-            </span>
-          </div>
-          <p className="text-xs mt-0.5" style={textTertiary}>
-            {format(new Date(entry.date), "d MMMM yyyy", { locale: fr })}
-            {entry.brand && ` — ${entry.brand}`}
-            {entry.notes && ` — ${entry.notes}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 ml-2">
-          <button
-            onClick={onStartEdit}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: "var(--bm-text-secondary)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            title="Modifier"
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            onClick={() => onDelete(entry.id)}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: "#C06B5A" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bm-surface)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-            title="Supprimer"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

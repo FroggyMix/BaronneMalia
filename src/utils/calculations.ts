@@ -1,6 +1,6 @@
 import { differenceInDays, differenceInWeeks, differenceInMonths } from "date-fns";
 import { getIdealWeightRange, getWeightStatus as _getWeightStatus, getWeightStatusLabel as _getWeightStatusLabel } from "@/data/growthCurve";
-import type { WeightEntry } from "@/types";
+import type { WeightEntry, FeedingEntry } from "@/types";
 
 // Re-export for convenience
 export const getWeightStatus = _getWeightStatus;
@@ -353,4 +353,100 @@ export function getBCSDescription(score: number): string {
   if (score === 7) return "Surpoids";
   if (score >= 8) return "Obèse";
   return "";
+}
+
+/**
+ * Compare real feeding intake with theoretical needs, adjusted for weight status and trend.
+ * Returns actionable recommendation with percentage adjustment.
+ */
+export function getFeedingAnalysis(
+  feedingHistory: FeedingEntry[],
+  theoreticalKcal: number,
+  weightStatus: string,
+  trendDescription: string,
+): {
+  status: string;
+  reasoning: string;
+  actualKcal: number;
+  adjustedKcal: number;
+  adjustmentPercent: number;
+} {
+  // Compute average daily intake from last 7 days of recorded feedings
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const recentFeedings = feedingHistory
+    .filter((f) => new Date(f.date) >= sevenDaysAgo)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Average daily kcal consumed (approximate: 1g croquettes ≈ 3.5-4 kcal, patee ≈ 1.2 kcal/g)
+  // Simplified: use kcal/g factor based on food type
+  const kcalPerGram: Record<string, number> = {
+    croquettes: 3.7,
+    "patée": 1.2,
+    mix: 2.5,
+    BARF: 1.5,
+    maison: 1.8,
+  };
+
+  let actualKcal = 0;
+  if (recentFeedings.length > 0) {
+    const totalGrams = recentFeedings.reduce(
+      (sum, f) => sum + f.mealsPerDay * f.quantityPerMealGrams,
+      0
+    );
+    const avgFoodType = recentFeedings[0].foodType;
+    const kcalFactor = kcalPerGram[avgFoodType] || 3.0;
+    // Normalize to daily average over the period
+    const daysCovered = Math.max(1, recentFeedings.length / (recentFeedings[0]?.mealsPerDay || 2));
+    actualKcal = Math.round((totalGrams * kcalFactor) / daysCovered);
+  }
+
+  // Determine adjustment based on weight status + trend
+  let adjustmentPercent = 0;
+  let reasoning = "";
+
+  if (weightStatus === "overweight") {
+    if (trendDescription.includes("Hausse")) {
+      adjustmentPercent = -20;
+      reasoning = `Le poids est au-dessus de l'idéal avec une tendance à la hausse (${trendDescription.toLowerCase()}). L'apport actuel (${actualKcal} kcal/j) dépasse les besoins. Une réduction de 20% est recommandée pour inverser la courbe.`;
+    } else {
+      adjustmentPercent = -10;
+      reasoning = `Le poids est au-dessus de l'idéal. L'apport actuel (${actualKcal} kcal/j) légèrement supérieur aux besoins théoriques (${theoreticalKcal} kcal). Réduction de 10% pour revenir dans la fourchette.`;
+    }
+  } else if (weightStatus === "underweight") {
+    if (trendDescription.includes("Baisse")) {
+      adjustmentPercent = +20;
+      reasoning = `Le poids est en-dessous de l'idéal avec une tendance à la baisse. L'apport actuel (${actualKcal} kcal/j) est insuffisant. Une augmentation de 20% est nécessaire pour reprendre du poids de manière saine.`;
+    } else {
+      adjustmentPercent = +10;
+      reasoning = `Le poids est en-dessous de l'idéal. L'apport actuel (${actualKcal} kcal/j) est légèrement insuffisant. Augmentation de 10% pour progresser vers le poids cible.`;
+    }
+  } else {
+    // Ideal weight — use trend to fine-tune
+    if (trendDescription === "Hausse rapide") {
+      adjustmentPercent = -5;
+      reasoning = `Poids idéal mais croissance très rapide. Légère réduction de 5% pour ralentir et éviter un surpoids précoce qui pourrait aggraver la dysplasie de hanche.`;
+    } else if (trendDescription === "Baisse modérée" || trendDescription === "Baisse rapide") {
+      adjustmentPercent = +5;
+      reasoning = `Poids idéal mais légère baisse détectée. Augmentation de 5% pour maintenir la trajectoire de croissance optimale.`;
+    } else {
+      adjustmentPercent = 0;
+      reasoning = `Le poids est idéal et la tendance est stable. L'apport actuel (${actualKcal} kcal/j) est bien adapté. Continuez sur cette lancée.`;
+    }
+  }
+
+  const adjustedKcal = Math.round(theoreticalKcal * (1 + adjustmentPercent / 100));
+
+  return {
+    status: adjustmentPercent < 0
+      ? "Surconsommation détectée"
+      : adjustmentPercent > 0
+      ? "Sous-consommation détectée"
+      : "Apport optimal",
+    reasoning,
+    actualKcal,
+    adjustedKcal,
+    adjustmentPercent,
+  };
 }

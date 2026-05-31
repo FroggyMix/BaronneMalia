@@ -4,7 +4,7 @@ import type { TabRoute } from "@/types";
 
 const TABS: { path: TabRoute; label: string; icon: React.ElementType }[] = [
   { path: "/", label: "Accueil", icon: Home },
-  { path: "/saisie", label: "Saisie", icon: Scale },
+  { path: "/saisie", label: "Journal", icon: Scale },
   { path: "/courbe", label: "Courbe", icon: TrendingUp },
   { path: "/conseils", label: "Conseils", icon: BookOpen },
 ];

@@ -137,10 +137,6 @@ function App() {
                   onResetDemo={resetWithDemoData}
                   onClearAll={clearAllData}
                   updateReference={updateReference}
-                  onUpdateWeight={updateWeightEntry}
-                  onDeleteWeight={deleteWeightEntry}
-                  onUpdateFeeding={updateFeedingEntry}
-                  onDeleteFeeding={deleteFeedingEntry}
                 />
               }
             />
@@ -151,6 +147,10 @@ function App() {
                   data={data}
                   onAddWeight={addWeightEntry}
                   onAddFeeding={addFeedingEntry}
+                  onUpdateWeight={updateWeightEntry}
+                  onDeleteWeight={deleteWeightEntry}
+                  onUpdateFeeding={updateFeedingEntry}
+                  onDeleteFeeding={deleteFeedingEntry}
                   selectedReference={selectedReference}
                   onExport={exportData}
                   onImport={importData}
