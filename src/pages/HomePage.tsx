@@ -24,6 +24,7 @@ import {
   getFeedingRecommendation,
   getWeightStatus,
   getFeedingAnalysis,
+  getGramsEstimate,
 } from "@/utils/calculations";
 import { getAdviceForAge } from "@/data/nutritionAdvice";
 import { Header } from "@/components/Header";
@@ -44,14 +45,36 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }
   overweight: { color: "#C06B5A", bg: "#E8D0CA", label: "Au-dessus de l'idéal" },
 };
 
-const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> = {
-  "Hausse rapide": { icon: TrendingUp, color: "#C06B5A" },
-  "Hausse modérée": { icon: TrendingUp, color: "#C8956C" },
-  "Stable": { icon: Minus, color: "#7A8B6E" },
-  "Baisse modérée": { icon: TrendingDown, color: "#C8956C" },
-  "Baisse rapide": { icon: TrendingDown, color: "#C06B5A" },
-  "Pas assez de données": { icon: Minus, color: "rgba(45,42,38,0.4)" },
+const TREND_ICONS: Record<string, typeof TrendingUp> = {
+  "Hausse rapide": TrendingUp,
+  "Hausse modérée": TrendingUp,
+  "Stable": Minus,
+  "Baisse modérée": TrendingDown,
+  "Baisse rapide": TrendingDown,
+  "Pas assez de données": Minus,
 };
+
+/** Return color based on trend + age context. Growth is expected for puppies,
+ *  so rapid growth under 4 months is green (normal), not red. */
+function getTrendColor(trendDescription: string, ageWeeks: number): string {
+  switch (trendDescription) {
+    case "Hausse rapide":
+      // Rapid growth is normal for young puppies
+      if (ageWeeks < 17) return "#7A8B6E"; // < 4 months: green, perfectly normal
+      if (ageWeeks < 26) return "#C8956C"; // 4-6 months: orange, watch
+      return "#C06B5A"; // > 6 months: red, too fast
+    case "Hausse modérée":
+      return "#7A8B6E"; // Always green, this is ideal
+    case "Stable":
+      return "#7A8B6E"; // Green
+    case "Baisse modérée":
+      return "#C8956C"; // Orange, concerning
+    case "Baisse rapide":
+      return "#C06B5A"; // Red, always alarming
+    default:
+      return "rgba(45,42,38,0.4)";
+  }
+}
 
 export function HomePage({
   data,
@@ -74,6 +97,13 @@ export function HomePage({
 
   const currentWeight = stats.currentWeight || 0;
   const weightStatus = getWeightStatus(currentWeight, ageWeeks);
+
+  // Most recent feeding entry (for caloric density and display)
+  const lastFeeding: FeedingEntry | null = feedingHistory.length > 0
+    ? [...feedingHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+    : null;
+  const lastFeedingKcal = lastFeeding?.foodCaloriesPer100g || 370;
+
   const feeding = getFeedingRecommendation(
     currentWeight,
     ageWeeks,
@@ -81,6 +111,7 @@ export function HomePage({
     profile.activityLevel,
     weightHistory,
     profile.birthDate,
+    lastFeedingKcal,
   );
 
   // NEW: Feeding analysis — real vs theoretical with weight-state adjustment
@@ -112,19 +143,14 @@ export function HomePage({
   }, [ageWeeks, currentWeight, weightStatus]);
 
   const status = STATUS_CONFIG[weightStatus] || STATUS_CONFIG.ideal;
-  const trendEntry = TREND_CONFIG[trend.trendDescription] || TREND_CONFIG["Pas assez de données"];
-  const TrendIcon = trendEntry.icon;
-  const trendColor = trendEntry.color;
+  const TrendIcon = TREND_ICONS[trend.trendDescription] || TREND_ICONS["Pas assez de données"];
+  const trendColor = getTrendColor(trend.trendDescription, ageWeeks);
 
   const lastDate = stats.currentDate
     ? format(new Date(stats.currentDate), "d MMMM yyyy", { locale: fr })
     : "Aucune pesée";
 
   // Most recent feeding entry
-  const lastFeeding: FeedingEntry | null = feedingHistory.length > 0
-    ? [...feedingHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-    : null;
-
   const cardStyle = { backgroundColor: "var(--bm-card-bg)" };
   const textPrimary = { color: "var(--bm-charcoal)" };
   const textSecondary = { color: "var(--bm-text-secondary)" };
@@ -229,13 +255,17 @@ export function HomePage({
             {/* Theoretical recommendation */}
             <div className="space-y-1 mb-3">
               <p className="text-sm" style={textSecondary}>
-                Besoins théoriques pour un chiot de {currentWeight.toFixed(1)} kg à {Math.round(ageWeeks / 4.33)} mois :
+                Besoins pour {currentWeight.toFixed(1)} kg à {Math.round(ageWeeks / 4.33)} mois :
               </p>
               <p className="text-2xl font-bold" style={textPrimary}>
                 {feeding.dailyKcal} <span className="text-base font-medium" style={textSecondary}>kcal/jour</span>
               </p>
               <p className="text-sm" style={textTertiary}>
-                ≈ {feeding.mealsPerDay} repas de ~{feeding.kcalPerMeal} kcal | {feeding.gramsEstimate}g de croquettes standard
+                ≈ {feeding.mealsPerDay} repas de ~{feeding.kcalPerMeal} kcal
+                {" "}| {feeding.gramsEstimate}g
+                {lastFeedingKcal !== 365 && (
+                  <span style={textSecondary}> (croquettes à {lastFeedingKcal} kcal/100g)</span>
+                )}
               </p>
             </div>
 
@@ -265,9 +295,9 @@ export function HomePage({
                 </p>
                 {feedingAnalysis.adjustedKcal != null && (
                   <p className="text-xs font-semibold mt-1" style={{ color: "var(--bm-gold)" }}>
-                    Ration ajustée recommandée : {feedingAnalysis.adjustedKcal} kcal/jour
-                    {" "}({feedingAnalysis.adjustmentPercent > 0 ? "+" : ""}
-                    {feedingAnalysis.adjustmentPercent}%)
+                    Ration ajustée : {feedingAnalysis.adjustedKcal} kcal/j
+                    {" "}({feedingAnalysis.adjustmentPercent > 0 ? "+" : ""}{feedingAnalysis.adjustmentPercent}%)
+                    {" "}| {getGramsEstimate(feedingAnalysis.adjustedKcal, lastFeedingKcal)}g/j
                   </p>
                 )}
               </div>

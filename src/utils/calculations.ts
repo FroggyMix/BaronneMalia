@@ -91,28 +91,39 @@ export function getAgeInMonths(birthDate: string, referenceDate?: string): numbe
 }
 
 /**
- * Get formatted age string (e.g. "15 semaines (3.5 mois)")
+ * Get formatted age string with context-aware precision:
+ * - Under 1 year: "X mois et Y semaines" (e.g. "3 mois et 2 semaines")
+ * - 1 to 5 years: "X ans et Y mois" (e.g. "2 ans et 6 mois")
+ * - Over 5 years: "X ans" (e.g. "7 ans")
  */
 export function getAgeDisplay(birthDate: string, referenceDate?: string): string {
-  const weeks = getAgeInWeeks(birthDate, referenceDate);
-  const months = getAgeInMonths(birthDate, referenceDate);
-  const remainingWeeks = weeks % 4;
-  
-  if (weeks < 8) {
-    return `${weeks} semaine${weeks > 1 ? "s" : ""}`;
-  }
-  
+  const days = getAgeInDays(birthDate, referenceDate);
+  const weeks = Math.floor(days / 7);
+  const totalMonths = getAgeInMonths(birthDate, referenceDate);
+  const years = Math.floor(totalMonths / 12);
+
+  // Under 1 year: months + weeks
   if (weeks < 52) {
-    if (remainingWeeks === 0) {
+    const months = Math.floor(weeks / 4.33);
+    const remainingWeeks = Math.round(weeks - months * 4.33);
+    if (months === 0) {
+      return `${weeks} semaine${weeks > 1 ? "s" : ""}`;
+    }
+    if (remainingWeeks <= 0) {
       return `${months} mois`;
     }
-    return `${months}.${Math.round(remainingWeeks / 4 * 10)} mois (${weeks} sem.)`;
+    return `${months} mois et ${remainingWeeks} semaine${remainingWeeks > 1 ? "s" : ""}`;
   }
-  
-  const years = Math.floor(months / 12);
-  const remMonths = months % 12;
-  if (remMonths === 0) return `${years} an${years > 1 ? "s" : ""}`;
-  return `${years} an${years > 1 ? "s" : ""} et ${remMonths} mois`;
+
+  // 1 to 5 years: years + months
+  if (years >= 1 && years < 5) {
+    const remMonths = totalMonths % 12;
+    if (remMonths === 0) return `${years} an${years > 1 ? "s" : ""}`;
+    return `${years} an${years > 1 ? "s" : ""} et ${remMonths} mois`;
+  }
+
+  // Over 5 years: years only
+  return `${years} an${years > 1 ? "s" : ""}`;
 }
 
 /**
@@ -128,19 +139,19 @@ export function getMealFrequency(ageWeeks: number): number {
  * Calculate cups estimate from daily kcal
  * Standard kibble: ~365 kcal per cup (350-380 range)
  */
-export function getCupsEstimate(dailyKcal: number): string {
-  const KCAL_PER_CUP = 365;
-  const cups = dailyKcal / KCAL_PER_CUP;
+export function getCupsEstimate(dailyKcal: number, kcalPer100g?: number): string {
+  const kcalPerCup = (kcalPer100g || 365) * 1.0; // 1 cup ≈ 100g for standard kibble
+  const cups = dailyKcal / kcalPerCup;
   return cups.toFixed(1);
 }
 
 /**
- * Get grams estimate from daily kcal
- * Standard kibble: ~365 kcal/100g
+ * Get grams estimate from daily kcal.
+ * Uses custom kcalPer100g if provided, otherwise defaults to 365.
  */
-export function getGramsEstimate(dailyKcal: number): number {
-  const KCAL_PER_100G = 365;
-  return Math.round((dailyKcal / KCAL_PER_100G) * 100);
+export function getGramsEstimate(dailyKcal: number, kcalPer100g?: number): number {
+  const kcalPer100 = kcalPer100g || 365;
+  return Math.round((dailyKcal / kcalPer100) * 100);
 }
 
 /**
@@ -265,6 +276,7 @@ export function getFeedingRecommendation(
   activityLevel: "sedentary" | "moderate" | "active" | "very_active",
   entries: WeightEntry[],
   birthDate: string,
+  kcalPer100g?: number,
 ): {
   dailyKcal: number;
   mealsPerDay: number;
@@ -325,8 +337,8 @@ export function getFeedingRecommendation(
     dailyKcal: adjustedKcal,
     mealsPerDay: meals,
     kcalPerMeal,
-    cupsEstimate: getCupsEstimate(adjustedKcal),
-    gramsEstimate: getGramsEstimate(adjustedKcal),
+    cupsEstimate: getCupsEstimate(adjustedKcal, kcalPer100g),
+    gramsEstimate: getGramsEstimate(adjustedKcal, kcalPer100g),
     recommendation,
     warning,
     adjusted,

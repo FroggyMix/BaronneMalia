@@ -99,6 +99,7 @@ export function SaisiePage({
   const [foodType, setFoodType] = useState("croquettes");
   const [feedingNotes, setFeedingNotes] = useState("");
   const [foodBrand, setFoodBrand] = useState("");
+  const [foodCaloriesPer100g, setFoodCaloriesPer100g] = useState(370);
 
   // Edit state
   const [editingWeightId, setEditingWeightId] = useState<string | null>(null);
@@ -142,6 +143,7 @@ export function SaisiePage({
       mealsPerDay,
       quantityPerMealGrams: quantityPerMeal,
       foodType,
+      foodCaloriesPer100g: foodCaloriesPer100g || 370,
       brand: foodBrand || undefined,
       notes: feedingNotes || undefined,
     });
@@ -330,15 +332,24 @@ export function SaisiePage({
                 <p className="text-xs mt-1" style={textSecondary}>Total quotidien : {quantityPerMeal * mealsPerDay}g</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={textSecondary}>Type d'alimentation</label>
-                <div className="relative">
-                  <select value={foodType} onChange={(e) => setFoodType(e.target.value)}
-                    className="w-full h-12 px-4 pr-10 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-[var(--bm-gold)] shadow-sm appearance-none"
-                    style={{ backgroundColor: "var(--bm-card-bg)", color: "var(--bm-charcoal)", border: "1px solid var(--bm-border)" }}>
-                    {FOOD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                  <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={textSecondary} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5" style={textSecondary}>Type</label>
+                  <div className="relative">
+                    <select value={foodType} onChange={(e) => setFoodType(e.target.value)}
+                      className="w-full h-12 px-3 pr-8 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--bm-gold)] shadow-sm appearance-none"
+                      style={{ backgroundColor: "var(--bm-card-bg)", color: "var(--bm-charcoal)", border: "1px solid var(--bm-border)" }}>
+                      {FOOD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={textSecondary} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5" style={textSecondary}>kcal / 100g *</label>
+                  <input type="number" min={50} max={800} step={5} value={foodCaloriesPer100g}
+                    onChange={(e) => setFoodCaloriesPer100g(Math.max(50, Math.min(800, parseInt(e.target.value) || 370)))}
+                    className="w-full h-12 px-3 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--bm-gold)] shadow-sm text-center"
+                    style={{ backgroundColor: "var(--bm-card-bg)", color: "var(--bm-charcoal)", border: "1px solid var(--bm-border)" }} />
                 </div>
               </div>
 
