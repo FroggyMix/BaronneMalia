@@ -263,10 +263,10 @@ export function HomePage({
                 <p className="text-xs leading-relaxed" style={textSecondary}>
                   {feedingAnalysis.reasoning}
                 </p>
-                {feedingAnalysis.adjustedKcal && feedingAnalysis.adjustedKcal !== feeding.dailyKcal && (
+                {feedingAnalysis.adjustedKcal != null && (
                   <p className="text-xs font-semibold mt-1" style={{ color: "var(--bm-gold)" }}>
                     Ration ajustée recommandée : {feedingAnalysis.adjustedKcal} kcal/jour
-                    {" "}({feedingAnalysis.adjustmentPercent && feedingAnalysis.adjustmentPercent > 0 ? "+" : ""}
+                    {" "}({feedingAnalysis.adjustmentPercent > 0 ? "+" : ""}
                     {feedingAnalysis.adjustmentPercent}%)
                   </p>
                 )}

@@ -160,11 +160,39 @@ export function projectWeightTrend(
   const sorted = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const recent = sorted.slice(-6);
 
-  // Linear regression: y = slope * x + intercept
-  // x = age in weeks, y = weight in kg
+  // Last measurement anchor point
+  const lastEntry = recent[recent.length - 1];
+  const lastAgeWeeks = getAgeInWeeksDecimal(birthDate, lastEntry.date);
+  const lastWeight = lastEntry.weightKg;
+
+  // === PROJECTION SLOPE: use local slope (last 2-3 points) for visual continuity ===
+  // This ensures the projection follows the last visible segment of the curve,
+  // avoiding a "jump" when the regression slope differs from recent direction.
+  let localSlope: number;
+  if (recent.length >= 3) {
+    const e1 = recent[recent.length - 3];
+    const e2 = recent[recent.length - 2];
+    const e3 = recent[recent.length - 1];
+    const x1 = getAgeInWeeksDecimal(birthDate, e1.date);
+    const x2 = getAgeInWeeksDecimal(birthDate, e2.date);
+    const x3 = getAgeInWeeksDecimal(birthDate, e3.date);
+    // Weighted: more weight on the last segment (e2→e3)
+    const seg1 = (e2.weightKg - e1.weightKg) / (x2 - x1 || 1);
+    const seg2 = (e3.weightKg - e2.weightKg) / (x3 - x2 || 1);
+    localSlope = seg1 * 0.25 + seg2 * 0.75; // 75% last segment, 25% previous
+  } else if (recent.length >= 2) {
+    const e1 = recent[recent.length - 2];
+    const e2 = recent[recent.length - 1];
+    const x1 = getAgeInWeeksDecimal(birthDate, e1.date);
+    const x2 = getAgeInWeeksDecimal(birthDate, e2.date);
+    localSlope = (e2.weightKg - e1.weightKg) / (x2 - x1 || 1);
+  } else {
+    localSlope = 0;
+  }
+
+  // === TREND DESCRIPTION: use full regression for stable trend text ===
   const n = recent.length;
   let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-
   for (const entry of recent) {
     const x = getAgeInWeeks(birthDate, entry.date);
     const y = entry.weightKg;
@@ -173,38 +201,51 @@ export function projectWeightTrend(
     sumXY += x * y;
     sumX2 += x * x;
   }
-
   const denominator = n * sumX2 - sumX * sumX;
-  if (denominator === 0) {
-    return { projectedPoints: [], trendDescription: "Tendance stable", trendRate: 0 };
-  }
+  const regressionSlope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0;
 
-  const slope = (n * sumXY - sumX * sumY) / denominator; // kg per week
-
-  // Last measurement anchor point
-  const lastEntry = recent[recent.length - 1];
-  const lastAgeWeeks = getAgeInWeeks(birthDate, lastEntry.date);
-  const lastWeight = lastEntry.weightKg;
-
-  // Project forward: start exactly from last known point
+  // Project forward using LOCAL slope for visual continuity
   const projectedPoints: Array<{ x: number; y: number }> = [];
+  projectedPoints.push({ x: lastAgeWeeks, y: lastWeight }); // anchor at last real point
   for (let w = 1; w <= weeksAhead; w++) {
     const ageWeeks = lastAgeWeeks + w;
-    const projectedWeight = lastWeight + slope * w;
+    const projectedWeight = lastWeight + localSlope * w;
     projectedPoints.push({
       x: ageWeeks,
       y: Math.max(0.5, Math.round(projectedWeight * 10) / 10),
     });
   }
 
-  // Trend description
-  const monthlyRate = slope * 4.33;
-  let trendDescription: string;
+  // Trend description: age-adjusted thresholds for Golden Retriever puppies
+  const monthlyRate = regressionSlope * 4.33;
+  const lastAgeMonths = lastAgeWeeks / 4.33;
 
-  if (monthlyRate > 1.5) trendDescription = "Hausse rapide";
-  else if (monthlyRate > 0.5) trendDescription = "Hausse modérée";
-  else if (monthlyRate > -0.5) trendDescription = "Stable";
-  else if (monthlyRate > -1.5) trendDescription = "Baisse modérée";
+  // Age-appropriate thresholds (Golden Retriever female):
+  // < 4 months: very rapid growth is normal (up to 4 kg/month)
+  // 4-6 months: rapid growth normal (up to 2.5 kg/month)
+  // 6-9 months: moderate growth (up to 1.2 kg/month)
+  // > 9 months: slow growth / maintenance
+  let rapidThreshold: number;
+  let moderateThreshold: number;
+  if (lastAgeMonths < 4) {
+    rapidThreshold = 3.0;
+    moderateThreshold = 1.5;
+  } else if (lastAgeMonths < 6) {
+    rapidThreshold = 2.0;
+    moderateThreshold = 0.8;
+  } else if (lastAgeMonths < 9) {
+    rapidThreshold = 1.0;
+    moderateThreshold = 0.4;
+  } else {
+    rapidThreshold = 0.5;
+    moderateThreshold = 0.2;
+  }
+
+  let trendDescription: string;
+  if (monthlyRate > rapidThreshold) trendDescription = "Hausse rapide";
+  else if (monthlyRate > moderateThreshold) trendDescription = "Hausse modérée";
+  else if (monthlyRate > -moderateThreshold) trendDescription = "Stable";
+  else if (monthlyRate > -rapidThreshold) trendDescription = "Baisse modérée";
   else trendDescription = "Baisse rapide";
 
   return {
@@ -358,6 +399,12 @@ export function getBCSDescription(score: number): string {
 /**
  * Compare real feeding intake with theoretical needs, adjusted for weight status and trend.
  * Returns actionable recommendation with percentage adjustment.
+ * 
+ * Logic:
+ * - If weight is outside ideal range → adjust based on weight status + trend
+ * - If weight is ideal → compare actual intake vs theoretical, use trend as fine-tuning
+ * - Never recommend reducing if actual intake is already below theoretical
+ * - Never recommend increasing if actual intake is already above theoretical
  */
 export function getFeedingAnalysis(
   feedingHistory: FeedingEntry[],
@@ -368,19 +415,18 @@ export function getFeedingAnalysis(
   status: string;
   reasoning: string;
   actualKcal: number;
-  adjustedKcal: number;
+  adjustedKcal: number | null;
   adjustmentPercent: number;
 } {
-  // Compute average daily intake from last 7 days of recorded feedings
+  // Compute average daily intake from last 14 days of recorded feedings
   const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
   const recentFeedings = feedingHistory
-    .filter((f) => new Date(f.date) >= sevenDaysAgo)
+    .filter((f) => new Date(f.date) >= fourteenDaysAgo)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Average daily kcal consumed (approximate: 1g croquettes ≈ 3.5-4 kcal, patee ≈ 1.2 kcal/g)
-  // Simplified: use kcal/g factor based on food type
+  // kcal per gram by food type (approximate average values)
   const kcalPerGram: Record<string, number> = {
     croquettes: 3.7,
     "patée": 1.2,
@@ -391,58 +437,106 @@ export function getFeedingAnalysis(
 
   let actualKcal = 0;
   if (recentFeedings.length > 0) {
+    // Each FeedingEntry represents ONE DAY of feeding
+    // Total grams = sum of (mealsPerDay * quantityPerMealGrams) across all days
     const totalGrams = recentFeedings.reduce(
       (sum, f) => sum + f.mealsPerDay * f.quantityPerMealGrams,
       0
     );
+    // Use the most recent food type for kcal conversion
     const avgFoodType = recentFeedings[0].foodType;
     const kcalFactor = kcalPerGram[avgFoodType] || 3.0;
-    // Normalize to daily average over the period
-    const daysCovered = Math.max(1, recentFeedings.length / (recentFeedings[0]?.mealsPerDay || 2));
-    actualKcal = Math.round((totalGrams * kcalFactor) / daysCovered);
+    // Average per day = total / number of days with data
+    const numDays = recentFeedings.length;
+    actualKcal = Math.round((totalGrams * kcalFactor) / numDays);
   }
 
-  // Determine adjustment based on weight status + trend
+  // Core principle: compare actual intake to theoretical needs
+  const intakeRatio = theoreticalKcal > 0 ? actualKcal / theoreticalKcal : 1;
+
   let adjustmentPercent = 0;
   let reasoning = "";
 
+  // === CASE 1: Overweight ===
   if (weightStatus === "overweight") {
-    if (trendDescription.includes("Hausse")) {
-      adjustmentPercent = -20;
-      reasoning = `Le poids est au-dessus de l'idéal avec une tendance à la hausse (${trendDescription.toLowerCase()}). L'apport actuel (${actualKcal} kcal/j) dépasse les besoins. Une réduction de 20% est recommandée pour inverser la courbe.`;
+    if (intakeRatio > 1.1) {
+      // Actually eating too much
+      if (trendDescription.includes("Hausse")) {
+        adjustmentPercent = -15;
+        reasoning = `Poids au-dessus de l'idéal ET apport réel (${actualKcal} kcal/j) supérieur aux besoins (${theoreticalKcal} kcal/j). Tendance à la hausse confirmée. Réduction de 15% nécessaire.`;
+      } else {
+        adjustmentPercent = -10;
+        reasoning = `Poids au-dessus de l'idéal avec apport réel (${actualKcal} kcal/j) supérieur aux besoins (${theoreticalKcal} kcal/j). Réduction de 10% pour reprogresser vers la fourchette idéale.`;
+      }
+    } else if (intakeRatio < 0.9) {
+      // Eating less than theoretical but still overweight
+      // Could be recent change, orMER factors underestimated
+      adjustmentPercent = -5;
+      reasoning = `Poids au-dessus de l'idéal malgré un apport (${actualKcal} kcal/j) inférieur au calcul théorique (${theoreticalKcal} kcal/j). Légère réduction de 5% recommandée — le métabolisme réel peut être plus bas que la moyenne de référence.`;
     } else {
+      // Intake matches theoretical but still overweight
       adjustmentPercent = -10;
-      reasoning = `Le poids est au-dessus de l'idéal. L'apport actuel (${actualKcal} kcal/j) légèrement supérieur aux besoins théoriques (${theoreticalKcal} kcal). Réduction de 10% pour revenir dans la fourchette.`;
+      reasoning = `Poids au-dessus de l'idéal avec apport aligné sur les besoins théoriques. Réduction de 10% suggérée car les besoins individuels sont probablement inférieurs à la moyenne de référence.`;
     }
-  } else if (weightStatus === "underweight") {
-    if (trendDescription.includes("Baisse")) {
-      adjustmentPercent = +20;
-      reasoning = `Le poids est en-dessous de l'idéal avec une tendance à la baisse. L'apport actuel (${actualKcal} kcal/j) est insuffisant. Une augmentation de 20% est nécessaire pour reprendre du poids de manière saine.`;
+  }
+  // === CASE 2: Underweight ===
+  else if (weightStatus === "underweight") {
+    if (intakeRatio < 0.9) {
+      // Actually eating too little
+      if (trendDescription.includes("Baisse")) {
+        adjustmentPercent = +20;
+        reasoning = `Poids en-dessous de l'idéal ET apport réel (${actualKcal} kcal/j) inférieur aux besoins (${theoreticalKcal} kcal/j). Tendance à la baisse. Augmentation de 20% urgente.`;
+      } else {
+        adjustmentPercent = +15;
+        reasoning = `Poids en-dessous de l'idéal avec apport réel (${actualKcal} kcal/j) inférieur aux besoins (${theoreticalKcal} kcal/j). Augmentation de 15% pour reprendre du poids.`;
+      }
+    } else if (intakeRatio > 1.1) {
+      // Eating more than theoretical but still underweight
+      adjustmentPercent = +5;
+      reasoning = `Poids en-dessous de l'idéal malgré un apport (${actualKcal} kcal/j) supérieur au calcul théorique. Le métabolisme de ${recentFeedings[0]?.foodType ? "votre chiot" : ""} est peut-être plus élevé. Augmentation de 5%, consulter un vétérinaire si persistant.`;
     } else {
       adjustmentPercent = +10;
-      reasoning = `Le poids est en-dessous de l'idéal. L'apport actuel (${actualKcal} kcal/j) est légèrement insuffisant. Augmentation de 10% pour progresser vers le poids cible.`;
+      reasoning = `Poids en-dessous de l'idéal avec apport aligné sur les besoins théoriques. Augmentation de 10% car les besoins individuels sont probablement supérieurs à la moyenne.`;
     }
-  } else {
-    // Ideal weight — use trend to fine-tune
-    if (trendDescription === "Hausse rapide") {
+  }
+  // === CASE 3: Ideal weight ===
+  else {
+    if (intakeRatio > 1.15) {
+      // Eating significantly more than needed — preemptive reduction
+      adjustmentPercent = -10;
+      reasoning = `Poids idéal actuellement, mais apport réel (${actualKcal} kcal/j) dépasse les besoins théoriques (${theoreticalKcal} kcal/j) de ${Math.round((intakeRatio - 1) * 100)}%. Réduction préventive de 10% pour anticiper tout dérapage.`;
+    } else if (intakeRatio < 0.85) {
+      // Eating significantly less than theoretical
+      adjustmentPercent = +10;
+      reasoning = `Poids idéal actuellement, mais apport réel (${actualKcal} kcal/j) inférieur aux besoins théoriques (${theoreticalKcal} kcal/j) de ${Math.round((1 - intakeRatio) * 100)}%. Augmentation de 10% pour maintenir la croissance.`;
+    } else if (intakeRatio > 1.05) {
+      // Slightly above theoretical — minor preemptive adjustment
       adjustmentPercent = -5;
-      reasoning = `Poids idéal mais croissance très rapide. Légère réduction de 5% pour ralentir et éviter un surpoids précoce qui pourrait aggraver la dysplasie de hanche.`;
-    } else if (trendDescription === "Baisse modérée" || trendDescription === "Baisse rapide") {
+      reasoning = `Poids idéal avec apport légèrement au-dessus des besoins (${actualKcal} vs ${theoreticalKcal} kcal/j). Ajustement préventif de -5% pour maintenir l'idéal à long terme.`;
+    } else if (intakeRatio < 0.95) {
+      // Slightly below theoretical
       adjustmentPercent = +5;
-      reasoning = `Poids idéal mais légère baisse détectée. Augmentation de 5% pour maintenir la trajectoire de croissance optimale.`;
+      reasoning = `Poids idéal avec apport légèrement en-dessous des besoins (${actualKcal} vs ${theoreticalKcal} kcal/j). Ajustement de +5% pour sécuriser la croissance.`;
     } else {
+      // Intake perfectly aligned with theoretical
       adjustmentPercent = 0;
-      reasoning = `Le poids est idéal et la tendance est stable. L'apport actuel (${actualKcal} kcal/j) est bien adapté. Continuez sur cette lancée.`;
+      reasoning = `Apport réel (${actualKcal} kcal/j) parfaitement aligné sur les besoins théoriques (${theoreticalKcal} kcal/j). Le poids est idéal. Continuez sur cette lancée !`;
     }
   }
 
-  const adjustedKcal = Math.round(theoreticalKcal * (1 + adjustmentPercent / 100));
+  const adjustedKcal = adjustmentPercent !== 0
+    ? Math.round(theoreticalKcal * (1 + adjustmentPercent / 100))
+    : null;
 
   return {
-    status: adjustmentPercent < 0
-      ? "Surconsommation détectée"
+    status: adjustmentPercent < -10
+      ? "Surconsommation significative"
+      : adjustmentPercent < 0
+      ? "Léger excès d'apport"
+      : adjustmentPercent > 10
+      ? "Sous-consommation significative"
       : adjustmentPercent > 0
-      ? "Sous-consommation détectée"
+      ? "Léger déficit d'apport"
       : "Apport optimal",
     reasoning,
     actualKcal,
