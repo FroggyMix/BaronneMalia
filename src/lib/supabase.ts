@@ -93,6 +93,23 @@ export async function addFeedingEntry(entry: Omit<FeedingEntry, "id">): Promise<
   return mapDbFeedingEntry(data);
 }
 
+export async function updateFeedingEntry(id: string, updates: Partial<FeedingEntry>): Promise<void> {
+  const dbUpdates = feedingEntryToDb(updates);
+  const { error } = await supabase
+    .from("feeding_entries")
+    .update(dbUpdates)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteFeedingEntry(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("feeding_entries")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
 // === Auth ===
 export async function signInAnonymously(): Promise<string | null> {
   const { data, error } = await supabase.auth.signInAnonymously();

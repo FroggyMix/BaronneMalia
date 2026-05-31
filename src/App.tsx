@@ -46,7 +46,11 @@ function App() {
     isOnline,
     isConfigured,
     addWeightEntry,
+    updateWeightEntry,
+    deleteWeightEntry,
     addFeedingEntry,
+    updateFeedingEntry,
+    deleteFeedingEntry,
     updateReference,
     exportData,
     importData,
@@ -133,6 +137,10 @@ function App() {
                   onResetDemo={resetWithDemoData}
                   onClearAll={clearAllData}
                   updateReference={updateReference}
+                  onUpdateWeight={updateWeightEntry}
+                  onDeleteWeight={deleteWeightEntry}
+                  onUpdateFeeding={updateFeedingEntry}
+                  onDeleteFeeding={deleteFeedingEntry}
                 />
               }
             />

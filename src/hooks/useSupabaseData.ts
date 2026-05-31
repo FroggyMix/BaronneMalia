@@ -10,6 +10,8 @@ import {
   deleteWeightEntry as deleteWeightEntryRemote,
   getFeedingEntries,
   addFeedingEntry as addFeedingEntryRemote,
+  updateFeedingEntry as updateFeedingEntryRemote,
+  deleteFeedingEntry as deleteFeedingEntryRemote,
   signInAnonymously,
 } from "@/lib/supabase";
 
@@ -259,6 +261,44 @@ export function useSupabaseData() {
     [isConfigured, isOnline]
   );
 
+  const updateFeedingEntry = useCallback(
+    async (id: string, updates: Partial<FeedingEntry>) => {
+      setData((prev) => ({
+        ...prev,
+        feedingHistory: prev.feedingHistory.map((e) =>
+          e.id === id ? { ...e, ...updates } : e
+        ),
+      }));
+
+      if (isConfigured && isOnline) {
+        try {
+          await updateFeedingEntryRemote(id, updates);
+        } catch (e) {
+          console.warn("Failed to sync feeding update:", e);
+        }
+      }
+    },
+    [isConfigured, isOnline]
+  );
+
+  const deleteFeedingEntry = useCallback(
+    async (id: string) => {
+      setData((prev) => ({
+        ...prev,
+        feedingHistory: prev.feedingHistory.filter((e) => e.id !== id),
+      }));
+
+      if (isConfigured && isOnline) {
+        try {
+          await deleteFeedingEntryRemote(id);
+        } catch (e) {
+          console.warn("Failed to sync feeding delete:", e);
+        }
+      }
+    },
+    [isConfigured, isOnline]
+  );
+
   const updateProfile = useCallback(
     async (updates: Partial<DogProfile>) => {
       const newProfile = { ...data.profile, ...updates };
@@ -342,6 +382,8 @@ export function useSupabaseData() {
     updateWeightEntry,
     deleteWeightEntry,
     addFeedingEntry,
+    updateFeedingEntry,
+    deleteFeedingEntry,
     updateProfile,
     updateSettings,
     updateReference,
