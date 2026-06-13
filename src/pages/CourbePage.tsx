@@ -103,13 +103,8 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
   const stats = getWeightStats(weightHistory);
   const trend = projectWeightTrend(weightHistory, profile.birthDate, 6);
   const currentWeight = stats.currentWeight || 0;
-  // Last real data point age (for X-axis label filtering)
-  const sortedEntries = [...weightHistory].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-  const lastRealWeek = sortedEntries.length > 0
-    ? getAgeInWeeksDecimal(profile.birthDate, sortedEntries[sortedEntries.length - 1].date)
-    : ageWeeksDecimal;
+  // Note: X-axis is now strictly bounded to the dog's current age (endWeek = ageWeeksDecimal)
+  // Projection is drawn but naturally clipped at this boundary
   // Use the selected reference for weight status calculation
   const activeReference = GROWTH_REFERENCES.find(r => r.id === selectedReference)
     || GROWTH_REFERENCES[0];
@@ -118,7 +113,9 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
 
   // X-axis zoom window (in weeks since birth, with decimals)
   const { startWeek, endWeek } = useMemo(() => {
-    const end = ageWeeksDecimal + 3;
+    // X-axis ends at the dog's CURRENT AGE — never beyond
+    // Projection is drawn but clipped at this boundary
+    const end = ageWeeksDecimal;
     let start: number;
     switch (timeRange) {
       case "1m": start = Math.max(8, ageWeeksDecimal - 5); break;
@@ -333,8 +330,6 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           autoSkip: false,
           callback: function (value) {
             const week = Number(value);
-            // Only show labels up to the last real data point (not projection)
-            if (week > lastRealWeek + 0.5) return "";
             const rem = week % 4;
             if (Math.abs(rem) < 0.3 || Math.abs(rem - 4) < 0.3) {
               return formatAgeLabel(week);
