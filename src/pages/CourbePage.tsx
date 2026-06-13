@@ -38,7 +38,34 @@ import {
 } from "@/utils/calculations";
 import type { AppData } from "@/types";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+// Plugin: major grid lines at month boundaries (primary grid)
+// The built-in Chart.js grid is at weekly intervals (secondary, very faint)
+const majorMonthGridPlugin = {
+  id: 'majorMonthGrid',
+  afterDraw(chart: any) {
+    const { ctx, scales: { x, y } } = chart;
+    if (!x || !y) return;
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    ctx.save();
+    ctx.strokeStyle = isDarkMode ? 'rgba(245,240,232,0.10)' : 'rgba(45,42,38,0.07)';
+    ctx.lineWidth = 1;
+    const startMonth = Math.floor(x.min / MONTH_IN_WEEKS);
+    const endMonth = Math.ceil(x.max / MONTH_IN_WEEKS);
+    for (let m = startMonth; m <= endMonth; m++) {
+      const weekPos = m * MONTH_IN_WEEKS;
+      if (weekPos >= x.min - 0.1 && weekPos <= x.max + 0.1) {
+        const xPos = x.getPixelForValue(weekPos);
+        ctx.beginPath();
+        ctx.moveTo(xPos, y.top);
+        ctx.lineTo(xPos, y.bottom);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+};
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend, majorMonthGridPlugin);
 
 interface Point {
   x: number;
@@ -117,13 +144,19 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
   // endWeek includes margin so projection is visible
   const PROJECTION_MARGIN = 3;
   const { startWeek, endWeek } = useMemo(() => {
-    const rawStart = Math.max(8, ageWeeksDecimal - (timeRange === "1m" ? 5 : timeRange === "3m" ? 14 : timeRange === "6m" ? 27 : 0));
+    let rawStart: number;
+    switch (timeRange) {
+      case "1m": rawStart = Math.max(8, ageWeeksDecimal - 5); break;
+      case "3m": rawStart = Math.max(8, ageWeeksDecimal - 14); break;
+      case "6m": rawStart = Math.max(8, ageWeeksDecimal - 27); break;
+      default: rawStart = 8; // "all" : show from week 8
+    }
     const rawEnd = ageWeeksDecimal + PROJECTION_MARGIN;
     return { startWeek: Math.floor(rawStart), endWeek: Math.ceil(rawEnd) };
   }, [ageWeeksDecimal, timeRange]);
 
-  // Y range from visible data
-  const { yMin, yMax } = useMemo(() => {
+  // Y range — rounded to INTEGER kg with smart stepSize (1, 2, or 5)
+  const { yMin, yMax, yStep } = useMemo(() => {
     let minVal = Infinity;
     let maxVal = -Infinity;
     const refData = getReferenceData(selectedReference);
@@ -149,9 +182,20 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
       }
     });
     const range = maxVal - minVal;
+    // Add padding
+    let yMinCalc = Math.max(0, minVal - range * 0.1);
+    let yMaxCalc = maxVal + range * 0.1;
+    // Pick best step (1, 2, or 5) for integer kg grid
+    const totalRange = yMaxCalc - yMinCalc;
+    let step = 1;
+    if (totalRange > 30) step = 5;
+    else if (totalRange > 12) step = 2;
+    else step = 1;
+    // Round to step multiples
     return {
-      yMin: Math.max(0, Math.floor((minVal - range * 0.1) * 10) / 10),
-      yMax: Math.ceil((maxVal + range * 0.1) * 10) / 10,
+      yMin: Math.floor(yMinCalc / step) * step,
+      yMax: Math.ceil(yMaxCalc / step) * step,
+      yStep: step,
     };
   }, [startWeek, endWeek, weightHistory, profile.birthDate, trend, selectedReference]);
 
@@ -318,7 +362,8 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
         type: "linear",
         min: startWeek,
         max: endWeek,
-        grid: { color: isDark ? "rgba(245,240,232,0.06)" : "rgba(45,42,38,0.04)" },
+        // Secondary grid: weekly, very faint
+        grid: { color: isDark ? "rgba(245,240,232,0.03)" : "rgba(45,42,38,0.03)" },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: isDark ? "rgba(245,240,232,0.5)" : "rgba(45,42,38,0.5)",
@@ -326,24 +371,28 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           stepSize: 1,
           callback: function (value: string | number) {
             const week = Number(value);
-            // Hide labels beyond current age + 1 week
-            if (week > ageWeeksDecimal + 1) return "";
-            // Show label every 2 weeks (even week numbers) for readability
-            if (Math.round(week) % 2 !== 0) return "";
-            return formatAgeLabel(week);
+            // Hide labels beyond current age
+            if (week > ageWeeksDecimal + 0.5) return "";
+            // Show month labels only (weeks close to month boundaries)
+            const months = week / MONTH_IN_WEEKS;
+            const roundedMonths = Math.round(months);
+            if (roundedMonths > 0 && Math.abs(months - roundedMonths) < 0.12) {
+              return `${roundedMonths}m`;
+            }
+            return "";
           },
         } as any,
-        border: { color: isDark ? "rgba(245,240,232,0.1)" : "rgba(45,42,38,0.1)" },
+        border: { color: isDark ? "rgba(245,240,232,0.08)" : "rgba(45,42,38,0.08)" },
       },
       y: {
         min: yMin,
         max: yMax,
-        grid: { color: isDark ? "rgba(245,240,232,0.08)" : "rgba(45,42,38,0.06)" },
+        grid: { color: isDark ? "rgba(245,240,232,0.06)" : "rgba(45,42,38,0.05)" },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: isDark ? "rgba(245,240,232,0.5)" : "rgba(45,42,38,0.5)",
+          stepSize: yStep,
           callback: (value) => `${value} kg`,
-          stepSize: Math.max(0.5, Math.round((yMax - yMin) / 6 * 10) / 10),
         },
         border: { display: false },
       },
