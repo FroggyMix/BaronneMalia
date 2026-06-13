@@ -113,21 +113,13 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
   const weightStatus = getWeightStatus(currentWeight, Math.round(ageWeeksDecimal), activeReference);
   const idealRange = getIdealWeightRangeRef(Math.round(ageWeeksDecimal), selectedReference);
 
-  // X-axis zoom window (in weeks since birth, with decimals)
-  // endWeek includes margin for projection visibility, rounded to month boundary for uniform grid
-  const PROJECTION_MARGIN = 3; // weeks of projection to show
+  // X-axis window — INTEGER weeks for perfectly uniform weekly grid
+  // endWeek includes margin so projection is visible
+  const PROJECTION_MARGIN = 3;
   const { startWeek, endWeek } = useMemo(() => {
+    const rawStart = Math.max(8, ageWeeksDecimal - (timeRange === "1m" ? 5 : timeRange === "3m" ? 14 : timeRange === "6m" ? 27 : 0));
     const rawEnd = ageWeeksDecimal + PROJECTION_MARGIN;
-    // Round to nearest month boundary (multiples of MONTH_IN_WEEKS) for uniform grid lines
-    const end = Math.ceil(rawEnd / MONTH_IN_WEEKS) * MONTH_IN_WEEKS;
-    let start: number;
-    switch (timeRange) {
-      case "1m": start = Math.max(MONTH_IN_WEEKS * 2, ageWeeksDecimal - 5); break;
-      case "3m": start = Math.max(MONTH_IN_WEEKS * 2, ageWeeksDecimal - 14); break;
-      case "6m": start = Math.max(MONTH_IN_WEEKS * 2, ageWeeksDecimal - 27); break;
-      default: start = MONTH_IN_WEEKS * 2;
-    }
-    return { startWeek: Math.floor(start / MONTH_IN_WEEKS) * MONTH_IN_WEEKS, endWeek: end };
+    return { startWeek: Math.floor(rawStart), endWeek: Math.ceil(rawEnd) };
   }, [ageWeeksDecimal, timeRange]);
 
   // Y range from visible data
@@ -331,21 +323,13 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           font: { family: "'Inter', sans-serif", size: 11 },
           color: isDark ? "rgba(245,240,232,0.5)" : "rgba(45,42,38,0.5)",
           maxRotation: 0,
-          autoSkip: false,
-          // Explicit tick values at month boundaries for perfectly uniform grid
-          values: (() => {
-            const ticks: number[] = [];
-            const startMonth = Math.floor(startWeek / MONTH_IN_WEEKS);
-            const endMonth = Math.ceil(endWeek / MONTH_IN_WEEKS);
-            for (let m = startMonth; m <= endMonth; m++) {
-              ticks.push(Math.round(m * MONTH_IN_WEEKS * 100) / 100);
-            }
-            return ticks;
-          })(),
+          stepSize: 1,
           callback: function (value: string | number) {
             const week = Number(value);
-            // Hide labels beyond the dog's current age (keep space for projection)
-            if (week > ageWeeksDecimal + 0.5) return "";
+            // Hide labels beyond current age + 1 week
+            if (week > ageWeeksDecimal + 1) return "";
+            // Show label every 2 weeks (even week numbers) for readability
+            if (Math.round(week) % 2 !== 0) return "";
             return formatAgeLabel(week);
           },
         } as any,
