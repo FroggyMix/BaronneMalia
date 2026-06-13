@@ -25,7 +25,9 @@ import {
   getWeightStatus,
   getFeedingAnalysis,
   getGramsEstimate,
+  getTrendColor,
 } from "@/utils/calculations";
+import { GROWTH_REFERENCES } from "@/data/growthReferences";
 import { getAdviceForAge } from "@/data/nutritionAdvice";
 import { Header } from "@/components/Header";
 
@@ -54,27 +56,7 @@ const TREND_ICONS: Record<string, typeof TrendingUp> = {
   "Pas assez de données": Minus,
 };
 
-/** Return color based on trend + age context. Growth is expected for puppies,
- *  so rapid growth under 4 months is green (normal), not red. */
-function getTrendColor(trendDescription: string, ageWeeks: number): string {
-  switch (trendDescription) {
-    case "Hausse rapide":
-      // Rapid growth is normal for young puppies
-      if (ageWeeks < 17) return "#7A8B6E"; // < 4 months: green, perfectly normal
-      if (ageWeeks < 26) return "#C8956C"; // 4-6 months: orange, watch
-      return "#C06B5A"; // > 6 months: red, too fast
-    case "Hausse modérée":
-      return "#7A8B6E"; // Always green, this is ideal
-    case "Stable":
-      return "#7A8B6E"; // Green
-    case "Baisse modérée":
-      return "#C8956C"; // Orange, concerning
-    case "Baisse rapide":
-      return "#C06B5A"; // Red, always alarming
-    default:
-      return "rgba(45,42,38,0.4)";
-  }
-}
+
 
 export function HomePage({
   data,
@@ -96,7 +78,14 @@ export function HomePage({
   const trend = projectWeightTrend(weightHistory, profile.birthDate, 6);
 
   const currentWeight = stats.currentWeight || 0;
-  const weightStatus = getWeightStatus(currentWeight, ageWeeks);
+
+  // Get the selected growth reference for breed-specific calculations
+  const activeReference = GROWTH_REFERENCES.find(r => r.id === selectedReference)
+    || GROWTH_REFERENCES.find(r => r.id === 'ref03') // default AKC/GRCA
+    || GROWTH_REFERENCES[0];
+
+  // Weight status based on the SELECTED reference (not hardcoded curve)
+  const weightStatus = getWeightStatus(currentWeight, ageWeeks, activeReference);
 
   // Most recent feeding entry (for caloric density and display)
   const lastFeeding: FeedingEntry | null = feedingHistory.length > 0

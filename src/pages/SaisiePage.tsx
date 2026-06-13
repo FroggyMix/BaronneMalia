@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -81,7 +82,11 @@ export function SaisiePage({
   onClearAll,
   onUpdateReference,
 }: SaisiePageProps) {
-  const [entryType, setEntryType] = useState<EntryType>("weight");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [entryType, setEntryType] = useState<EntryType>(
+    tabFromUrl === "nourriture" ? "feeding" : "weight"
+  );
   const [showSuccess, setShowSuccess] = useState(false);
   const [showWeightHistory, setShowWeightHistory] = useState(true);
   const [showFeedingHistory, setShowFeedingHistory] = useState(true);
@@ -322,12 +327,12 @@ export function SaisiePage({
 
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={textSecondary}>Quantité par repas (g) *</label>
-                <div className="rounded-xl shadow-sm flex items-center" style={{ backgroundColor: "var(--bm-card-bg)", border: "1px solid var(--bm-border)" }}>
-                  <button type="button" onClick={() => adjustQuantity(-10)} className="p-4 rounded-l-xl transition-colors" style={surfaceBg}><Minus size={20} style={{ color: "var(--bm-gold)" }} /></button>
+                <div className="rounded-xl shadow-sm flex items-center overflow-hidden" style={{ backgroundColor: "var(--bm-card-bg)", border: "1px solid var(--bm-border)" }}>
+                  <button type="button" onClick={() => adjustQuantity(-10)} className="px-3 py-3 rounded-l-xl transition-colors flex-shrink-0" style={surfaceBg}><Minus size={20} style={{ color: "var(--bm-gold)" }} /></button>
                   <input type="number" value={quantityPerMeal}
                     onChange={(e) => setQuantityPerMeal(Math.max(20, Math.min(1000, parseInt(e.target.value) || 0)))}
-                    className="flex-1 h-12 text-center text-2xl font-bold bg-transparent focus:outline-none" style={textPrimary} />
-                  <button type="button" onClick={() => adjustQuantity(10)} className="p-4 rounded-r-xl transition-colors" style={surfaceBg}><Plus size={20} style={{ color: "var(--bm-gold)" }} /></button>
+                    className="flex-1 min-w-0 h-12 text-center text-2xl font-bold bg-transparent focus:outline-none" style={textPrimary} />
+                  <button type="button" onClick={() => adjustQuantity(10)} className="px-3 py-3 rounded-r-xl transition-colors flex-shrink-0" style={surfaceBg}><Plus size={20} style={{ color: "var(--bm-gold)" }} /></button>
                 </div>
                 <p className="text-xs mt-1" style={textSecondary}>Total quotidien : {quantityPerMeal * mealsPerDay}g</p>
               </div>
@@ -500,6 +505,9 @@ export function SaisiePage({
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-sm" style={textPrimary}>{entry.mealsPerDay} x {entry.quantityPerMealGrams}g</span>
                                 <span className="px-1.5 py-0 rounded text-[10px] font-medium" style={{ backgroundColor: "var(--bm-pale-gold)", color: "var(--bm-gold)" }}>{FOOD_LABELS[entry.foodType] || entry.foodType}</span>
+                                {entry.foodCaloriesPer100g && (
+                                  <span className="px-1.5 py-0 rounded text-[10px] font-medium" style={{ backgroundColor: "#D4E0CD", color: "#7A8B6E" }}>{entry.foodCaloriesPer100g} kcal/100g</span>
+                                )}
                               </div>
                               <p className="text-[11px] mt-0.5" style={textTertiary}>
                                 {format(new Date(entry.date), "d MMM yyyy", { locale: fr })}

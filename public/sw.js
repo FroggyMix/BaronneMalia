@@ -38,28 +38,38 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: serve from cache, fallback to network
+// Fetch: network-first for Supabase API, cache-first for static assets
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // NETWORK-FIRST for Supabase API calls (always fetch fresh data)
+  if (url.hostname.includes('supabase.co')) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        return response;
+      }).catch(() => {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+  
+  // CACHE-FIRST for static assets (HTML, CSS, JS, icons)
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      // Return cached version if available
       if (cached) {
         return cached;
       }
-      // Otherwise fetch from network and cache it
       return fetch(event.request).then((response) => {
-        // Don't cache non-successful responses or non-GET requests
         if (!response || response.status !== 200 || event.request.method !== 'GET') {
           return response;
         }
-        // Clone the response (it's a stream, can only be consumed once)
         const responseToCache = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
         });
         return response;
       }).catch(() => {
-        // Network failed, try to serve cached index.html for navigation requests
         if (event.request.mode === 'navigate') {
           return caches.match(BASE + 'index.html');
         }

@@ -1,4 +1,5 @@
 import type { GrowthPoint } from "@/types";
+import type { GrowthReference } from "./growthReferences";
 
 // ============================================================
 // GOLDEN RETRIEVER FEMALE GROWTH CURVE
@@ -115,8 +116,42 @@ export function getIdealWeightRange(weeks: number): { min: number; max: number }
   };
 }
 
-export function getWeightStatus(currentWeight: number, ageWeeks: number): "underweight" | "ideal" | "overweight" {
-  const ideal = getIdealWeightRange(ageWeeks);
+/**
+ * Get ideal weight range from a specific GrowthReference (selected by user).
+ * If no reference provided, falls back to the default Golden Retriever curve.
+ */
+export function getIdealWeightRangeFromReference(
+  reference: GrowthReference,
+  weeks: number
+): { min: number; max: number } {
+  const data = reference.data;
+  if (weeks <= data[0].week) return { min: data[0].minKg, max: data[0].maxKg };
+  const last = data[data.length - 1];
+  if (weeks >= last.week) return { min: last.minKg, max: last.maxKg };
+
+  // Linear interpolation between data points
+  for (let i = 0; i < data.length - 1; i++) {
+    const lower = data[i];
+    const upper = data[i + 1];
+    if (weeks >= lower.week && weeks <= upper.week) {
+      const progress = (weeks - lower.week) / (upper.week - lower.week);
+      return {
+        min: Math.round((lower.minKg + (upper.minKg - lower.minKg) * progress) * 10) / 10,
+        max: Math.round((lower.maxKg + (upper.maxKg - lower.maxKg) * progress) * 10) / 10,
+      };
+    }
+  }
+  return { min: last.minKg, max: last.maxKg };
+}
+
+export function getWeightStatus(
+  currentWeight: number,
+  ageWeeks: number,
+  reference?: GrowthReference
+): "underweight" | "ideal" | "overweight" {
+  const ideal = reference
+    ? getIdealWeightRangeFromReference(reference, ageWeeks)
+    : getIdealWeightRange(ageWeeks);
   // Use a wider tolerance band (30% of the range) for "ideal" classification
   const tolerance = (ideal.max - ideal.min) * 0.3;
 

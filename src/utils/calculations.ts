@@ -1,10 +1,11 @@
 import { differenceInDays, differenceInWeeks, differenceInMonths } from "date-fns";
-import { getIdealWeightRange, getWeightStatus as _getWeightStatus, getWeightStatusLabel as _getWeightStatusLabel } from "@/data/growthCurve";
+import { getIdealWeightRange, getIdealWeightRangeFromReference, getWeightStatus as _getWeightStatus, getWeightStatusLabel as _getWeightStatusLabel } from "@/data/growthCurve";
 import type { WeightEntry, FeedingEntry } from "@/types";
 
 // Re-export for convenience
 export const getWeightStatus = _getWeightStatus;
 export const getWeightStatusLabel = _getWeightStatusLabel;
+export { getIdealWeightRangeFromReference };
 
 /**
  * Get age in days (precise, for chart positioning)
@@ -269,6 +270,30 @@ export function projectWeightTrend(
 /**
  * Get feeding recommendation with adjustments based on weight status and trend
  */
+/**
+ * Returns the appropriate trend color based on trend description and age.
+ * Rapid growth is normal for young puppies -> green.
+ */
+export function getTrendColor(trendDescription: string, ageWeeks: number): string {
+  const ageMonths = ageWeeks / 4.33;
+  switch (trendDescription) {
+    case "Hausse rapide":
+      if (ageMonths < 4) return "#7A8B6E";   // < 4 months: perfectly normal
+      if (ageMonths < 6) return "#C8956C";   // 4-6 months: watch
+      return "#C06B5A";                       // > 6 months: too fast
+    case "Hausse moderee":
+      return "#7A8B6E";                        // Always green, ideal
+    case "Stable":
+      return "#7A8B6E";
+    case "Baisse moderee":
+      return "#C8956C";
+    case "Baisse rapide":
+      return "#C06B5A";                        // Always alarming
+    default:
+      return "rgba(45,42,38,0.4)";
+  }
+}
+
 export function getFeedingRecommendation(
   currentWeightKg: number,
   ageWeeks: number,
@@ -448,18 +473,25 @@ export function getFeedingAnalysis(
   };
 
   let actualKcal = 0;
-  if (recentFeedings.length > 0) {
+  let sourceFeedings = recentFeedings;
+
+  // FALLBACK: if no feedings in last 14 days, use the most recent entry
+  if (recentFeedings.length === 0 && feedingHistory.length > 0) {
+    const mostRecent = [...feedingHistory].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )[0];
+    sourceFeedings = [mostRecent];
+  }
+
+  if (sourceFeedings.length > 0) {
     // Each FeedingEntry represents ONE DAY of feeding
-    // Total grams = sum of (mealsPerDay * quantityPerMealGrams) across all days
-    const totalGrams = recentFeedings.reduce(
+    const totalGrams = sourceFeedings.reduce(
       (sum, f) => sum + f.mealsPerDay * f.quantityPerMealGrams,
       0
     );
-    // Use the most recent food type for kcal conversion
-    const avgFoodType = recentFeedings[0].foodType;
+    const avgFoodType = sourceFeedings[0].foodType;
     const kcalFactor = kcalPerGram[avgFoodType] || 3.0;
-    // Average per day = total / number of days with data
-    const numDays = recentFeedings.length;
+    const numDays = sourceFeedings.length;
     actualKcal = Math.round((totalGrams * kcalFactor) / numDays);
   }
 

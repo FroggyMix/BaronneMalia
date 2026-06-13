@@ -34,6 +34,7 @@ import {
   projectWeightTrend,
   getWeightStatus,
   getWeightStatusLabel,
+  getTrendColor,
 } from "@/utils/calculations";
 import type { AppData } from "@/types";
 
@@ -63,13 +64,13 @@ const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: "1m", label: "1 mois" },
 ];
 
-const TREND_CONFIG: Record<string, { icon: typeof TrendingUp; color: string }> = {
-  "Hausse rapide": { icon: TrendingUp, color: "#C06B5A" },
-  "Hausse modérée": { icon: TrendingUp, color: "#C8956C" },
-  "Stable": { icon: Minus, color: "#7A8B6E" },
-  "Baisse modérée": { icon: TrendingDown, color: "#C8956C" },
-  "Baisse rapide": { icon: TrendingDown, color: "#C06B5A" },
-  "Pas assez de données": { icon: Minus, color: "rgba(45,42,38,0.4)" },
+const TREND_ICONS: Record<string, typeof TrendingUp> = {
+  "Hausse rapide": TrendingUp,
+  "Hausse modérée": TrendingUp,
+  "Stable": Minus,
+  "Baisse modérée": TrendingDown,
+  "Baisse rapide": TrendingDown,
+  "Pas assez de données": Minus,
 };
 
 // Items per page removed - history now in Journal page
@@ -102,7 +103,17 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
   const stats = getWeightStats(weightHistory);
   const trend = projectWeightTrend(weightHistory, profile.birthDate, 6);
   const currentWeight = stats.currentWeight || 0;
-  const weightStatus = getWeightStatus(currentWeight, Math.round(ageWeeksDecimal));
+  // Last real data point age (for X-axis label filtering)
+  const sortedEntries = [...weightHistory].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const lastRealWeek = sortedEntries.length > 0
+    ? getAgeInWeeksDecimal(profile.birthDate, sortedEntries[sortedEntries.length - 1].date)
+    : ageWeeksDecimal;
+  // Use the selected reference for weight status calculation
+  const activeReference = GROWTH_REFERENCES.find(r => r.id === selectedReference)
+    || GROWTH_REFERENCES[0];
+  const weightStatus = getWeightStatus(currentWeight, Math.round(ageWeeksDecimal), activeReference);
   const idealRange = getIdealWeightRangeRef(Math.round(ageWeeksDecimal), selectedReference);
 
   // X-axis zoom window (in weeks since birth, with decimals)
@@ -314,7 +325,7 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
         type: "linear",
         min: startWeek,
         max: endWeek,
-        grid: { display: false },
+        grid: { color: isDark ? "rgba(245,240,232,0.06)" : "rgba(45,42,38,0.04)" },
         ticks: {
           font: { family: "'Inter', sans-serif", size: 11 },
           color: isDark ? "rgba(245,240,232,0.5)" : "rgba(45,42,38,0.5)",
@@ -322,6 +333,8 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           autoSkip: false,
           callback: function (value) {
             const week = Number(value);
+            // Only show labels up to the last real data point (not projection)
+            if (week > lastRealWeek + 1) return "";
             const rem = week % 4;
             if (Math.abs(rem) < 0.3 || Math.abs(rem - 4) < 0.3) {
               return formatAgeLabel(week);
@@ -376,9 +389,8 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
     URL.revokeObjectURL(url);
   };
 
-  const trendEntry = TREND_CONFIG[trend.trendDescription] || TREND_CONFIG["Pas assez de données"];
-  const TrendIcon = trendEntry.icon;
-  const trendColor = trendEntry.color;
+  const TrendIcon = TREND_ICONS[trend.trendDescription] || TREND_ICONS["Pas assez de données"];
+  const trendColor = getTrendColor(trend.trendDescription, Math.round(ageWeeksDecimal));
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--bm-cream)" }}>
