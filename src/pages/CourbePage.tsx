@@ -75,12 +75,16 @@ const TREND_ICONS: Record<string, typeof TrendingUp> = {
 
 // Items per page removed - history now in Journal page
 
+// Average weeks per calendar month (365.25 / 12 / 7 = 4.345)
+// MUST match the calculation used in HomePage for age consistency
+const MONTH_IN_WEEKS = 4.345;
+
 function formatAgeLabel(weeks: number): string {
-  const months = Math.floor(weeks / 4);
-  const remWeeks = Math.round((weeks % 4) * 10) / 10;
-  if (months === 0) return `${remWeeks.toFixed(0)}s`;
-  if (remWeeks < 0.3) return `${months}m`;
-  return `${months}m${Math.round(remWeeks)}s`;
+  const months = Math.floor(weeks / MONTH_IN_WEEKS);
+  const remWeeks = Math.round(weeks % MONTH_IN_WEEKS);
+  if (months === 0) return `${remWeeks}s`;
+  if (remWeeks === 0) return `${months}m`;
+  return `${months}m${remWeeks}s`;
 }
 
 export function CourbePage({ data, selectedReference, onExport, onImport, onResetDemo, onClearAll, onUpdateReference }: CourbePageProps) {
@@ -103,8 +107,6 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
   const stats = getWeightStats(weightHistory);
   const trend = projectWeightTrend(weightHistory, profile.birthDate, 6);
   const currentWeight = stats.currentWeight || 0;
-  // Note: X-axis is now strictly bounded to the dog's current age (endWeek = ageWeeksDecimal)
-  // Projection is drawn but naturally clipped at this boundary
   // Use the selected reference for weight status calculation
   const activeReference = GROWTH_REFERENCES.find(r => r.id === selectedReference)
     || GROWTH_REFERENCES[0];
@@ -112,18 +114,20 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
   const idealRange = getIdealWeightRangeRef(Math.round(ageWeeksDecimal), selectedReference);
 
   // X-axis zoom window (in weeks since birth, with decimals)
+  // endWeek includes margin for projection visibility, rounded to month boundary for uniform grid
+  const PROJECTION_MARGIN = 3; // weeks of projection to show
   const { startWeek, endWeek } = useMemo(() => {
-    // X-axis ends at the dog's CURRENT AGE — never beyond
-    // Projection is drawn but clipped at this boundary
-    const end = ageWeeksDecimal;
+    const rawEnd = ageWeeksDecimal + PROJECTION_MARGIN;
+    // Round to nearest month boundary (multiples of MONTH_IN_WEEKS) for uniform grid lines
+    const end = Math.ceil(rawEnd / MONTH_IN_WEEKS) * MONTH_IN_WEEKS;
     let start: number;
     switch (timeRange) {
-      case "1m": start = Math.max(8, ageWeeksDecimal - 5); break;
-      case "3m": start = Math.max(8, ageWeeksDecimal - 14); break;
-      case "6m": start = Math.max(8, ageWeeksDecimal - 27); break;
-      default: start = 8;
+      case "1m": start = Math.max(MONTH_IN_WEEKS * 2, ageWeeksDecimal - 5); break;
+      case "3m": start = Math.max(MONTH_IN_WEEKS * 2, ageWeeksDecimal - 14); break;
+      case "6m": start = Math.max(MONTH_IN_WEEKS * 2, ageWeeksDecimal - 27); break;
+      default: start = MONTH_IN_WEEKS * 2;
     }
-    return { startWeek: start, endWeek: end };
+    return { startWeek: Math.floor(start / MONTH_IN_WEEKS) * MONTH_IN_WEEKS, endWeek: end };
   }, [ageWeeksDecimal, timeRange]);
 
   // Y range from visible data
@@ -328,19 +332,23 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           color: isDark ? "rgba(245,240,232,0.5)" : "rgba(45,42,38,0.5)",
           maxRotation: 0,
           autoSkip: false,
-          callback: function (value) {
+          // Explicit tick values at month boundaries for perfectly uniform grid
+          values: (() => {
+            const ticks: number[] = [];
+            const startMonth = Math.floor(startWeek / MONTH_IN_WEEKS);
+            const endMonth = Math.ceil(endWeek / MONTH_IN_WEEKS);
+            for (let m = startMonth; m <= endMonth; m++) {
+              ticks.push(Math.round(m * MONTH_IN_WEEKS * 100) / 100);
+            }
+            return ticks;
+          })(),
+          callback: function (value: string | number) {
             const week = Number(value);
-            const rem = week % 4;
-            if (Math.abs(rem) < 0.3 || Math.abs(rem - 4) < 0.3) {
-              return formatAgeLabel(week);
-            }
-            if (timeRange === "1m" && (Math.abs(rem - 2) < 0.3)) {
-              return formatAgeLabel(week);
-            }
-            return "";
+            // Hide labels beyond the dog's current age (keep space for projection)
+            if (week > ageWeeksDecimal + 0.5) return "";
+            return formatAgeLabel(week);
           },
-          stepSize: 1,
-        },
+        } as any,
         border: { color: isDark ? "rgba(245,240,232,0.1)" : "rgba(45,42,38,0.1)" },
       },
       y: {
