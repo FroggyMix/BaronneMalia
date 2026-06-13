@@ -101,6 +101,7 @@ export function HomePage({
     weightHistory,
     profile.birthDate,
     lastFeedingKcal,
+    activeReference,
   );
 
   // NEW: Feeding analysis — real vs theoretical with weight-state adjustment

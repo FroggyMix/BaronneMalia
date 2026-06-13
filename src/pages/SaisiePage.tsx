@@ -104,7 +104,8 @@ export function SaisiePage({
   const [foodType, setFoodType] = useState("croquettes");
   const [feedingNotes, setFeedingNotes] = useState("");
   const [foodBrand, setFoodBrand] = useState("");
-  const [foodCaloriesPer100g, setFoodCaloriesPer100g] = useState(370);
+  const [foodCaloriesPer100gStr, setFoodCaloriesPer100gStr] = useState("370");
+  const foodCaloriesPer100g = parseInt(foodCaloriesPer100gStr) || 370;
 
   // Edit state
   const [editingWeightId, setEditingWeightId] = useState<string | null>(null);
@@ -351,8 +352,14 @@ export function SaisiePage({
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5" style={textSecondary}>kcal / 100g *</label>
-                  <input type="number" min={50} max={800} step={5} value={foodCaloriesPer100g}
-                    onChange={(e) => setFoodCaloriesPer100g(Math.max(50, Math.min(800, parseInt(e.target.value) || 370)))}
+                  <input type="number" min={50} max={800} step={5} value={foodCaloriesPer100gStr}
+                    onChange={(e) => setFoodCaloriesPer100gStr(e.target.value)}
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!val || val < 50) setFoodCaloriesPer100gStr("370");
+                      else if (val > 800) setFoodCaloriesPer100gStr("800");
+                      else setFoodCaloriesPer100gStr(val.toString());
+                    }}
                     className="w-full h-12 px-3 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--bm-gold)] shadow-sm text-center"
                     style={{ backgroundColor: "var(--bm-card-bg)", color: "var(--bm-charcoal)", border: "1px solid var(--bm-border)" }} />
                 </div>

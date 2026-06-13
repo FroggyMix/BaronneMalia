@@ -177,27 +177,21 @@ export function projectWeightTrend(
   const lastAgeWeeks = getAgeInWeeksDecimal(birthDate, lastEntry.date);
   const lastWeight = lastEntry.weightKg;
 
-  // === PROJECTION SLOPE: use local slope (last 2-3 points) for visual continuity ===
-  // This ensures the projection follows the last visible segment of the curve,
-  // avoiding a "jump" when the regression slope differs from recent direction.
+  // === PROJECTION SLOPE: use regression on last 4-6 points ===
+  // Regression smooths out day-to-day variations and gives a stable projection.
+  // We use the LAST N points (not all 6) so the projection follows recent trend.
+  const recentForProjection = recent.slice(-6); // last 6 points max
   let localSlope: number;
-  if (recent.length >= 3) {
-    const e1 = recent[recent.length - 3];
-    const e2 = recent[recent.length - 2];
-    const e3 = recent[recent.length - 1];
-    const x1 = getAgeInWeeksDecimal(birthDate, e1.date);
-    const x2 = getAgeInWeeksDecimal(birthDate, e2.date);
-    const x3 = getAgeInWeeksDecimal(birthDate, e3.date);
-    // Weighted: more weight on the last segment (e2→e3)
-    const seg1 = (e2.weightKg - e1.weightKg) / (x2 - x1 || 1);
-    const seg2 = (e3.weightKg - e2.weightKg) / (x3 - x2 || 1);
-    localSlope = seg1 * 0.25 + seg2 * 0.75; // 75% last segment, 25% previous
-  } else if (recent.length >= 2) {
-    const e1 = recent[recent.length - 2];
-    const e2 = recent[recent.length - 1];
-    const x1 = getAgeInWeeksDecimal(birthDate, e1.date);
-    const x2 = getAgeInWeeksDecimal(birthDate, e2.date);
-    localSlope = (e2.weightKg - e1.weightKg) / (x2 - x1 || 1);
+  if (recentForProjection.length >= 2) {
+    const n = recentForProjection.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (const entry of recentForProjection) {
+      const x = getAgeInWeeksDecimal(birthDate, entry.date);
+      const y = entry.weightKg;
+      sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x;
+    }
+    const denom = n * sumX2 - sumX * sumX;
+    localSlope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
   } else {
     localSlope = 0;
   }
@@ -302,6 +296,7 @@ export function getFeedingRecommendation(
   entries: WeightEntry[],
   birthDate: string,
   kcalPer100g?: number,
+  reference?: any, // GrowthReference - use selected reference for ideal range
 ): {
   dailyKcal: number;
   mealsPerDay: number;
@@ -313,7 +308,10 @@ export function getFeedingRecommendation(
   adjusted: boolean;
 } {
   const mer = calculateMER(currentWeightKg, ageWeeks, isNeutered, activityLevel);
-  const idealRange = getIdealWeightRange(ageWeeks);
+  // Use selected reference's ideal range if available, otherwise fallback
+  const idealRange = reference
+    ? getIdealWeightRangeFromReference(reference, ageWeeks)
+    : getIdealWeightRange(ageWeeks);
   
   let adjustedKcal = mer;
   let adjusted = false;

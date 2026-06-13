@@ -15,6 +15,7 @@ import {
 import { Header } from "@/components/Header";
 import { getAdviceForAge, getAdviceByCategory } from "@/data/nutritionAdvice";
 import { getWeightStatus, getAgeInWeeks, getFeedingRecommendation } from "@/utils/calculations";
+import { GROWTH_REFERENCES } from "@/data/growthReferences";
 import type { AppData, NutritionAdvice } from "@/types";
 
 interface ConseilsPageProps {
@@ -51,9 +52,12 @@ export function ConseilsPage({ data, selectedReference, onExport, onImport, onRe
   const currentWeight = weightHistory.length > 0
     ? [...weightHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].weightKg
     : 0;
-  const weightStatus = getWeightStatus(currentWeight, ageWeeks);
+  const activeReference = GROWTH_REFERENCES.find(r => r.id === selectedReference)
+    || GROWTH_REFERENCES.find(r => r.id === 'ref03')
+    || GROWTH_REFERENCES[0];
+  const weightStatus = getWeightStatus(currentWeight, ageWeeks, activeReference);
   const feedingRec = currentWeight > 0
-    ? getFeedingRecommendation(currentWeight, ageWeeks, profile.neutered, profile.activityLevel, weightHistory, profile.birthDate)
+    ? getFeedingRecommendation(currentWeight, ageWeeks, profile.neutered, profile.activityLevel, weightHistory, profile.birthDate, undefined, activeReference)
     : null;
 
   const personalizedAdvice = useMemo(() => {

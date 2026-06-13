@@ -334,7 +334,7 @@ export function CourbePage({ data, selectedReference, onExport, onImport, onRese
           callback: function (value) {
             const week = Number(value);
             // Only show labels up to the last real data point (not projection)
-            if (week > lastRealWeek + 1) return "";
+            if (week > lastRealWeek + 0.5) return "";
             const rem = week % 4;
             if (Math.abs(rem) < 0.3 || Math.abs(rem - 4) < 0.3) {
               return formatAgeLabel(week);
